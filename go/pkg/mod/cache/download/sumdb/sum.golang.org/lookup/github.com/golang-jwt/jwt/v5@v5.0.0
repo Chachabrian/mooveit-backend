@@ -3,7 +3,7 @@ github.com/golang-jwt/jwt/v5 v5.0.0 h1:1n1XNM9hk7O9mnQoNBGolZvzebBQ7p93ULHRc28XJ
 github.com/golang-jwt/jwt/v5 v5.0.0/go.mod h1:pqrtFR0X4osieyHYxtmOUWsAWrfe1Q5UVIyoH402zdk=
 
 go.sum database tree
-34714544
-5tXQm/zowLFgnJrpgyqAtBDGqOqDq0mHeuO6I+8DlMM=
+34871449
+N92/VlZmKmLfOqxHdcFnRKVKLVR/uWFTlJ1ggzV54vI=
 
-— sum.golang.org Az3grsX/3sWhtpKP4/mCRVGseRyEArIM4068KLyFyDzhKRt/X7ibmbR9kE/pFm/b9GlOknJj2Ns8wfw0tdbBtFLPFgc=
+— sum.golang.org Az3grlDNqxw/7n20hwsYcOAcAq3LqYHuipSE1Va4uTP3RPCgTsM9iLUQBMUR98tdpPyB8O8FO+drys4lODn8tiWnQAM=

@@ -15,20 +15,20 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  go-app:
-    build: .
-    container_name: go-app
-    depends_on:
-      - postgres
-    environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: mesongoisaac
-      DB_PASSWORD: 789012
-      DB_NAME: Mooveit
-    ports:
-      - "8080:8080"
-    command: ["go", "run", "main.go"]
+  # go-app:
+  #   build: .
+  #   container_name: go-app
+  #   depends_on:
+  #     - postgres
+  #   environment:
+  #     DB_HOST: postgres
+  #     DB_PORT: 5432
+  #     DB_USER: mesongoisaac
+  #     DB_PASSWORD: 789012
+  #     DB_NAME: Mooveit
+  #   ports:
+  #     - "8080:8080"
+  #   command: ["go", "run", "main.go"]
 
 volumes:
   postgres_data:
