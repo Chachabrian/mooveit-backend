@@ -5,6 +5,7 @@ import (
     "strings"
 
     "github.com/gin-gonic/gin"
+    "github.com/golang-jwt/jwt/v5"  // Add this import
     "github.com/chachabrian/mooveit-backend/pkg/utils"
 )
 
