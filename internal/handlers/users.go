@@ -20,9 +20,12 @@ func GetProfile(db *gorm.DB) gin.HandlerFunc {
 		c.JSON(200, gin.H{
 			"id":          user.ID,
 			"email":       user.Email,
-			"username":    user.Username,    // Changed from name to username
-			"phoneNumber": user.PhoneNumber, // Changed from phone to phoneNumber
+			"username":    user.Username,
+			"phoneNumber": user.PhoneNumber,
 			"userType":    user.UserType,
+			"carPlate":    user.CarPlate,
+			"carMake":     user.CarMake,
+			"carColor":    user.CarColor,
 		})
 	}
 }
@@ -33,8 +36,11 @@ func UpdateProfile(db *gorm.DB) gin.HandlerFunc {
 		userId := c.GetUint("userId")
 
 		var input struct {
-			Username    string `json:"username"`    // Changed from name to username
-			PhoneNumber string `json:"phoneNumber"` // Changed from phone to phoneNumber
+			Username    string `json:"username"`
+			PhoneNumber string `json:"phoneNumber"`
+			CarPlate    string `json:"carPlate"`
+			CarMake     string `json:"carMake"`
+			CarColor    string `json:"carColor"`
 		}
 
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -49,8 +55,11 @@ func UpdateProfile(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		updates := map[string]interface{}{
-			"username":     input.Username,    // Changed from name to username
-			"phone_number": input.PhoneNumber, // Changed from phone to phone_number
+			"username":     input.Username,
+			"phone_number": input.PhoneNumber,
+			"car_plate":    input.CarPlate,
+			"car_make":     input.CarMake,
+			"car_color":    input.CarColor,
 		}
 
 		if err := db.Model(&user).Updates(updates).Error; err != nil {
@@ -61,9 +70,12 @@ func UpdateProfile(db *gorm.DB) gin.HandlerFunc {
 		c.JSON(200, gin.H{
 			"id":          user.ID,
 			"email":       user.Email,
-			"username":    user.Username,    // Changed from name to username
-			"phoneNumber": user.PhoneNumber, // Changed from phone to phoneNumber
+			"username":    user.Username,
+			"phoneNumber": user.PhoneNumber,
 			"userType":    user.UserType,
+			"carPlate":    user.CarPlate,
+			"carMake":     user.CarMake,
+			"carColor":    user.CarColor,
 		})
 	}
 }

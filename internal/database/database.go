@@ -1,13 +1,13 @@
-
 package database
 
 import (
     "fmt"
     "os"
+    "time"
 
     "gorm.io/driver/postgres"
     "gorm.io/gorm"
-    "github.com/chachabrian/mooveit-backend/internal/models"
+    "gorm.io/gorm/logger"
 )
 
 func InitDB() (*gorm.DB, error) {
@@ -20,19 +20,30 @@ func InitDB() (*gorm.DB, error) {
         os.Getenv("DB_PORT"),
     )
 
-    db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-    if err != nil {
-        return nil, err
+    // Configure GORM with custom logger
+    config := &gorm.Config{
+        Logger: logger.Default.LogMode(logger.Info),
     }
 
-    // Auto migrate the schema
-    err = db.AutoMigrate(
-        &models.User{},
-        &models.Booking{},
-        &models.Ride{},
-    )
-    if err != nil {
-        return nil, err
+    // Attempt to connect with retries
+    var db *gorm.DB
+    var err error
+    maxRetries := 5
+    for i := 0; i < maxRetries; i++ {
+        db, err = gorm.Open(postgres.Open(dsn), config)
+        if err == nil {
+            break
+        }
+        if i < maxRetries-1 {
+            time.Sleep(time.Second * 5)
+            continue
+        }
+        return nil, fmt.Errorf("failed to connect to database after %d attempts: %v", maxRetries, err)
+    }
+
+    // Run migrations
+    if err := RunMigrations(db); err != nil {
+        return nil, fmt.Errorf("failed to run migrations: %v", err)
     }
 
     return db, nil

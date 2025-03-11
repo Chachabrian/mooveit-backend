@@ -1,0 +1,14 @@
+[Unit]
+Description=MooveIT Backend Service
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/mooveit-backend
+ExecStart=/home/ubuntu/mooveit-backend/mooveit-backend
+Restart=always
+Environment=GIN_MODE=release
+
+[Install]
+WantedBy=multi-user.target

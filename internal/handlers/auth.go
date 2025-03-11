@@ -33,7 +33,7 @@ func Register(db *gorm.DB) gin.HandlerFunc {
 			Email:        input.Email,
 			PasswordHash: string(hashedPassword),
 			PhoneNumber:  input.Phone,
-			UserType:     input.UserType,
+			UserType:     models.UserType(input.UserType), // Convert string to UserType
 		}
 
 		if result := db.Create(&user); result.Error != nil {
@@ -50,7 +50,7 @@ type RegisterInput struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=6"`
 	Phone    string `json:"phone"`
-	UserType string `json:"userType" binding:"required,oneof=customer driver admin"`
+	UserType string `json:"userType" binding:"required,oneof=client driver"`
 }
 
 func Login(db *gorm.DB) gin.HandlerFunc {

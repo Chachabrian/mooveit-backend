@@ -1,34 +1,43 @@
-
 version: '3.8'
 
 services:
   postgres:
-    image: postgres:latest
+    image: postgres:15-alpine
     container_name: postgres-db
     restart: always
     environment:
-      POSTGRES_USER: mesongoisaac
-      POSTGRES_PASSWORD: 789012
-      POSTGRES_DB: Mooveit
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # go-app:
-  #   build: .
-  #   container_name: go-app
-  #   depends_on:
-  #     - postgres
-  #   environment:
-  #     DB_HOST: postgres
-  #     DB_PORT: 5432
-  #     DB_USER: mesongoisaac
-  #     DB_PASSWORD: 789012
-  #     DB_NAME: Mooveit
-  #   ports:
-  #     - "8080:8080"
-  #   command: ["go", "run", "main.go"]
+  go-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: go-app
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - PORT=8080
+      - GIN_MODE=release
+    ports:
+      - "8080:8080"
 
 volumes:
   postgres_data:
