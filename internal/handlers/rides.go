@@ -58,14 +58,16 @@ func GetAvailableRides(db *gorm.DB) gin.HandlerFunc {
 		destination := c.Query("destination")
 		currentLocation := c.Query("currentLocation")
 
-		query := db.Where("date > ? AND status = ?", time.Now(), "available")
+		query := db.Model(&models.Ride{}).
+			Joins("Driver").
+			Select("rides.*, users.username, users.phone_number, users.car_plate, users.car_make, users.car_color").
+			Where("rides.date > ? AND rides.status = ?", time.Now(), "available")
 
-		// Add search conditions if parameters are provided
 		if destination != "" {
-			query = query.Where("LOWER(destination) LIKE LOWER(?)", "%"+strings.ToLower(destination)+"%")
+			query = query.Where("LOWER(rides.destination) LIKE LOWER(?)", "%"+strings.ToLower(destination)+"%")
 		}
 		if currentLocation != "" {
-			query = query.Where("LOWER(current_location) LIKE LOWER(?)", "%"+strings.ToLower(currentLocation)+"%")
+			query = query.Where("LOWER(rides.current_location) LIKE LOWER(?)", "%"+strings.ToLower(currentLocation)+"%")
 		}
 
 		var rides []models.Ride
@@ -74,13 +76,35 @@ func GetAvailableRides(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Fetch driver details for each ride
-		for i := range rides {
-			var driver models.User
-			if err := db.Select("username, phone_number, car_plate, car_make, car_color").First(&driver, rides[i].DriverID).Error; err != nil {
-				continue
-			}
-			rides[i].Driver = &driver
+		c.JSON(200, rides)
+	}
+}
+
+// GetDriverRides retrieves all rides created by a specific driver
+func GetDriverRides(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userId := c.GetUint("userId")
+
+		var rides []models.Ride
+		if err := db.Where("driver_id = ?", userId).Find(&rides).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to fetch driver rides"})
+			return
+		}
+
+		c.JSON(200, rides)
+	}
+}
+
+// GetAllRides retrieves all rides in the system
+func GetAllRides(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var rides []models.Ride
+		if err := db.Model(&models.Ride{}).
+			Joins("Driver").
+			Select("rides.*, users.username, users.phone_number, users.car_plate, users.car_make, users.car_color").
+			Find(&rides).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to fetch rides"})
+			return
 		}
 
 		c.JSON(200, rides)

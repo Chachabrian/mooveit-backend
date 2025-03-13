@@ -4,8 +4,12 @@ FROM golang:1.24-alpine AS builder
 # Install required build tools
 RUN apk add --no-cache gcc musl-dev
 
-# Set working directory
-WORKDIR /app
+# Set Go environment variables
+ENV GO111MODULE=on
+ENV GO_MODULE=github.com/chachabrian/mooveit-backend
+
+# Set working directory to match Go module path
+WORKDIR /go/src/${GO_MODULE}
 
 # Copy go mod files
 COPY go.mod go.sum ./
@@ -31,8 +35,8 @@ RUN adduser -D appuser
 WORKDIR /app
 
 # Copy binary from builder
-COPY --from=builder /app/main .
-COPY --from=builder /app/.env.production .env
+COPY --from=builder /go/src/github.com/chachabrian/mooveit-backend/main .
+COPY --from=builder /go/src/github.com/chachabrian/mooveit-backend/.env.production .env
 
 # Use non-root user
 USER appuser
