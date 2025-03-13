@@ -15,5 +15,5 @@ type Ride struct {
 	Price           float64   `json:"price" gorm:"not null"`
 	Date            time.Time `json:"date" gorm:"not null"`
 	Status          string    `json:"status" gorm:"not null;default:'available'"`
-	Driver          *User     `json:"driver,omitempty" gorm:"-"`
+	Driver          *User     `json:"driver,omitempty" gorm:"foreignKey:DriverID"`
 }

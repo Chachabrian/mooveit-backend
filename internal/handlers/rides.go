@@ -58,9 +58,8 @@ func GetAvailableRides(db *gorm.DB) gin.HandlerFunc {
 		destination := c.Query("destination")
 		currentLocation := c.Query("currentLocation")
 
-		query := db.Model(&models.Ride{}).
-			Joins("Driver").
-			Select("rides.*, users.username, users.phone_number, users.car_plate, users.car_make, users.car_color").
+		var rides []models.Ride
+		query := db.Preload("Driver").
 			Where("rides.date > ? AND rides.status = ?", time.Now(), "available")
 
 		if destination != "" {
@@ -70,7 +69,6 @@ func GetAvailableRides(db *gorm.DB) gin.HandlerFunc {
 			query = query.Where("LOWER(rides.current_location) LIKE LOWER(?)", "%"+strings.ToLower(currentLocation)+"%")
 		}
 
-		var rides []models.Ride
 		if err := query.Find(&rides).Error; err != nil {
 			c.JSON(500, gin.H{"error": "Failed to fetch rides"})
 			return
@@ -99,10 +97,7 @@ func GetDriverRides(db *gorm.DB) gin.HandlerFunc {
 func GetAllRides(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var rides []models.Ride
-		if err := db.Model(&models.Ride{}).
-			Joins("Driver").
-			Select("rides.*, users.username, users.phone_number, users.car_plate, users.car_make, users.car_color").
-			Find(&rides).Error; err != nil {
+		if err := db.Preload("Driver").Find(&rides).Error; err != nil {
 			c.JSON(500, gin.H{"error": "Failed to fetch rides"})
 			return
 		}
