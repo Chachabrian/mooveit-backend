@@ -109,20 +109,33 @@ func GetDriverBookings(db *gorm.DB) gin.HandlerFunc {
 		userId := c.GetUint("userId")
 
 		var bookings []models.Booking
-		if err := db.Preload("Ride").
-			Preload("Ride.Driver").
-			Preload("Client").
-			Joins("JOIN rides ON rides.id = bookings.ride_id").
-			Where("rides.driver_id = ?", userId).
-			Order("bookings.created_at DESC"). // Show newest bookings first
-			Find(&bookings).Error; err != nil {
-			c.JSON(500, gin.H{"error": "Failed to fetch bookings: " + err.Error()})
+		result := db.Debug(). // Add Debug() to see the SQL query
+					Preload("Ride").
+					Preload("Ride.Driver").
+					Preload("Client").
+					Joins("JOIN rides ON rides.id = bookings.ride_id").
+					Where("rides.driver_id = ?", userId).
+					Order("bookings.created_at DESC").
+					Find(&bookings)
+
+		if result.Error != nil {
+			c.JSON(500, gin.H{"error": "Failed to fetch bookings: " + result.Error.Error()})
 			return
 		}
 
-		// Format the response to match the frontend requirements
-		var response []gin.H
+		// If no bookings found, return empty array instead of null
+		if len(bookings) == 0 {
+			c.JSON(200, []gin.H{})
+			return
+		}
+
+		response := make([]gin.H, 0)
 		for _, booking := range bookings {
+			// Check if required relationships are loaded
+			if booking.Client.ID == 0 || booking.Ride.ID == 0 {
+				continue
+			}
+
 			bookingDetails := gin.H{
 				"id":     booking.ID,
 				"status": booking.Status,
@@ -137,16 +150,21 @@ func GetDriverBookings(db *gorm.DB) gin.HandlerFunc {
 					"date":            booking.Ride.Date,
 					"price":           booking.Ride.Price,
 					"status":          booking.Ride.Status,
-					"driver": gin.H{
-						"username":    booking.Ride.Driver.Username,
-						"phoneNumber": booking.Ride.Driver.PhoneNumber,
-						"carPlate":    booking.Ride.Driver.CarPlate,
-						"carMake":     booking.Ride.Driver.CarMake,
-						"carColor":    booking.Ride.Driver.CarColor,
-					},
 				},
 				"createdAt": booking.CreatedAt,
 			}
+
+			// Only add driver details if available
+			if booking.Ride.Driver != nil {
+				bookingDetails["ride"].(gin.H)["driver"] = gin.H{
+					"username":    booking.Ride.Driver.Username,
+					"phoneNumber": booking.Ride.Driver.PhoneNumber,
+					"carPlate":    booking.Ride.Driver.CarPlate,
+					"carMake":     booking.Ride.Driver.CarMake,
+					"carColor":    booking.Ride.Driver.CarColor,
+				}
+			}
+
 			response = append(response, bookingDetails)
 		}
 
