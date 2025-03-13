@@ -10,6 +10,7 @@ const (
     BookingStatusPending   BookingStatus = "pending"
     BookingStatusAccepted BookingStatus = "accepted"
     BookingStatusRejected BookingStatus = "rejected"
+     BookingStatusCancelled BookingStatus = "cancelled"
 )
 
 type Booking struct {

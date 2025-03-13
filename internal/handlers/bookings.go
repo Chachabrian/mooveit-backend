@@ -109,16 +109,48 @@ func GetDriverBookings(db *gorm.DB) gin.HandlerFunc {
 		userId := c.GetUint("userId")
 
 		var bookings []models.Booking
-		if err := db.Joins("Ride").
-			Where("rides.driver_id = ?", userId).
+		if err := db.Preload("Ride").
+			Preload("Ride.Driver").
 			Preload("Client").
-			Preload("Ride").
+			Joins("JOIN rides ON rides.id = bookings.ride_id").
+			Where("rides.driver_id = ?", userId).
+			Order("bookings.created_at DESC"). // Show newest bookings first
 			Find(&bookings).Error; err != nil {
-			c.JSON(500, gin.H{"error": "Failed to fetch bookings"})
+			c.JSON(500, gin.H{"error": "Failed to fetch bookings: " + err.Error()})
 			return
 		}
 
-		c.JSON(200, bookings)
+		// Format the response to match the frontend requirements
+		var response []gin.H
+		for _, booking := range bookings {
+			bookingDetails := gin.H{
+				"id":     booking.ID,
+				"status": booking.Status,
+				"client": gin.H{
+					"username":    booking.Client.Username,
+					"phoneNumber": booking.Client.PhoneNumber,
+				},
+				"ride": gin.H{
+					"id":              booking.Ride.ID,
+					"currentLocation": booking.Ride.CurrentLocation,
+					"destination":     booking.Ride.Destination,
+					"date":            booking.Ride.Date,
+					"price":           booking.Ride.Price,
+					"status":          booking.Ride.Status,
+					"driver": gin.H{
+						"username":    booking.Ride.Driver.Username,
+						"phoneNumber": booking.Ride.Driver.PhoneNumber,
+						"carPlate":    booking.Ride.Driver.CarPlate,
+						"carMake":     booking.Ride.Driver.CarMake,
+						"carColor":    booking.Ride.Driver.CarColor,
+					},
+				},
+				"createdAt": booking.CreatedAt,
+			}
+			response = append(response, bookingDetails)
+		}
+
+		c.JSON(200, response)
 	}
 }
 
@@ -129,7 +161,7 @@ func UpdateBookingStatus(db *gorm.DB) gin.HandlerFunc {
 		userId := c.GetUint("userId")
 
 		var input struct {
-			Status string `json:"status" binding:"required,oneof=accepted rejected"`
+			Status string `json:"status" binding:"required,oneof=accepted rejected cancelled"`
 		}
 
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -143,17 +175,59 @@ func UpdateBookingStatus(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		if booking.Ride.DriverID != userId {
-			c.JSON(403, gin.H{"error": "Unauthorized"})
-			return
+		// Check permissions based on user type and action
+		if input.Status == "cancelled" {
+			// Only clients can cancel their own bookings
+			if booking.ClientID != userId {
+				c.JSON(403, gin.H{"error": "Only the client can cancel this booking"})
+				return
+			}
+		} else {
+			// Only drivers can accept/reject bookings for their rides
+			if booking.Ride.DriverID != userId {
+				c.JSON(403, gin.H{"error": "Only the driver can accept/reject this booking"})
+				return
+			}
 		}
 
+		// Start a transaction
+		tx := db.Begin()
+
+		// Update booking status
 		booking.Status = models.BookingStatus(input.Status)
-		if err := db.Save(&booking).Error; err != nil {
+		if err := tx.Save(&booking).Error; err != nil {
+			tx.Rollback()
 			c.JSON(500, gin.H{"error": "Failed to update booking status"})
 			return
 		}
 
-		c.JSON(200, booking)
+		// Update ride status based on booking status
+		if input.Status == "accepted" {
+			if err := tx.Model(&booking.Ride).Update("status", "booked").Error; err != nil {
+				tx.Rollback()
+				c.JSON(500, gin.H{"error": "Failed to update ride status"})
+				return
+			}
+		} else if input.Status == "cancelled" || input.Status == "rejected" {
+			// Reset ride status to available if booking is cancelled or rejected
+			if err := tx.Model(&booking.Ride).Update("status", "available").Error; err != nil {
+				tx.Rollback()
+				c.JSON(500, gin.H{"error": "Failed to update ride status"})
+				return
+			}
+		}
+
+		// Commit transaction
+		if err := tx.Commit().Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to commit transaction"})
+			return
+		}
+
+		c.JSON(200, gin.H{
+			"id":      booking.ID,
+			"status":  booking.Status,
+			"ride":    booking.Ride,
+			"message": "Booking status updated successfully",
+		})
 	}
 }
