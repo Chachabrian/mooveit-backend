@@ -41,6 +41,7 @@ jobs:
         uses: google-github-actions/auth@v1
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
+          token_format: 'access_token'
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
@@ -52,8 +53,15 @@ jobs:
           echo "Setting up Docker credentials for GCR..."
           gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://gcr.io
 
+      - name: Configure Docker for GCR
+        run: |
+          gcloud auth configure-docker gcr.io
+          gcloud auth configure-docker
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
+        env:
+          DOCKER_BUILDKIT: 1
         with:
           context: .
           push: true
