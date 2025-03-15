@@ -46,11 +46,7 @@ jobs:
         uses: google-github-actions/setup-gcloud@v1
 
       - name: Configure Docker to use gcloud as a credential helper for GCR
-        run: |
-          gcloud auth configure-docker gcr.io --quiet
-          # Explicitly set up authentication for the specific GCR repository
-          echo "Setting up Docker credentials for GCR..."
-          gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://gcr.io
+        run: gcloud auth configure-docker gcr.io --quiet
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
