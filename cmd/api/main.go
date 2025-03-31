@@ -90,7 +90,7 @@ func main() {
 				bookings.GET("/client", handlers.GetClientBookings(db))
 				bookings.GET("/driver", handlers.GetDriverBookings(db))
 				bookings.PATCH("/:id/status", handlers.UpdateBookingStatus(db))
-				bookings.GET("/:bookingId/parcel-details", handlers.GetParcelDetails(db))
+				bookings.GET("/:id/parcel-details", handlers.GetParcelDetails(db)) // Updated route
 			}
 
 			parcels := protected.Group("/parcels")

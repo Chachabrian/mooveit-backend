@@ -66,28 +66,27 @@ func CreateParcel(db *gorm.DB) gin.HandlerFunc {
 }
 
 func GetParcelDetails(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		bookingId := c.Param("bookingId")
+    return func(c *gin.Context) {
+        bookingId := c.Param("id") // Use "id" instead of "bookingId"
 
-		var booking models.Booking
-		if err := db.Preload("Ride").First(&booking, bookingId).Error; err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Booking not found"})
-			return
-		}
+        var booking models.Booking
+        if err := db.Preload("Ride").First(&booking, bookingId).Error; err != nil {
+            c.JSON(404, gin.H{"error": "Booking not found"})
+            return
+        }
 
-		var parcel models.Parcel
-		if err := db.Where("ride_id = ?", booking.RideID).First(&parcel).Error; err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Parcel details not found"})
-			return
-		}
+        var parcel models.Parcel
+        if err := db.Where("ride_id = ?", booking.RideID).First(&parcel).Error; err != nil {
+            c.JSON(404, gin.H{"error": "Parcel details not found"})
+            return
+        }
 
-		// Return parcel details with image URL
-		c.JSON(http.StatusOK, gin.H{
-			"parcelImage":       parcel.ParcelImage,
-			"parcelDescription": parcel.ParcelDescription,
-			"receiverName":      parcel.ReceiverName,
-			"receiverContact":   parcel.ReceiverContact,
-			"destination":       parcel.Destination,
-		})
-	}
+        c.JSON(200, gin.H{
+            "parcelImage":      parcel.ParcelImage,
+            "parcelDescription": parcel.ParcelDescription,
+            "receiverName":     parcel.ReceiverName,
+            "receiverContact":  parcel.ReceiverContact,
+            "destination":      parcel.Destination,
+        })
+    }
 }
