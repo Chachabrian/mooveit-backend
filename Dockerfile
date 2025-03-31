@@ -34,6 +34,9 @@ RUN adduser -D appuser
 
 WORKDIR /app
 
+# Create uploads directory with proper permissions
+RUN mkdir -p /app/uploads/parcels && chown -R appuser:appuser /app/uploads
+
 # Copy binary from builder
 COPY --from=builder /go/src/github.com/chachabrian/mooveit-backend/main .
 COPY --from=builder /go/src/github.com/chachabrian/mooveit-backend/.env.production .env

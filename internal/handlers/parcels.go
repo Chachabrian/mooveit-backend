@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/chachabrian/mooveit-backend/internal/models"
 	"github.com/gin-gonic/gin"
@@ -33,23 +35,32 @@ func CreateParcel(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Save the file to a directory
-		uploadDir := "./uploads/parcels"
-		if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload directory"})
+		// Use absolute path for uploads
+		uploadDir := "/app/uploads/parcels"
+
+		// Create directory if it doesn't exist
+		if err := os.MkdirAll(uploadDir, 0755); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload directory: " + err.Error()})
 			return
 		}
 
-		filePath := filepath.Join(uploadDir, file.Filename)
+		// Generate unique filename using timestamp
+		fileExt := filepath.Ext(file.Filename)
+		fileName := fmt.Sprintf("%d%s", time.Now().UnixNano(), fileExt)
+		filePath := filepath.Join(uploadDir, fileName)
+
 		if err := c.SaveUploadedFile(file, filePath); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file: " + err.Error()})
 			return
 		}
+
+		// Store relative path in database
+		dbPath := filepath.Join("uploads/parcels", fileName)
 
 		// Create parcel record
 		parcel := models.Parcel{
 			RideID:            input.RideID,
-			ParcelImage:       filePath,
+			ParcelImage:       dbPath,
 			ParcelDescription: input.ParcelDescription,
 			ReceiverName:      input.ReceiverName,
 			ReceiverContact:   input.ReceiverContact,
@@ -66,27 +77,27 @@ func CreateParcel(db *gorm.DB) gin.HandlerFunc {
 }
 
 func GetParcelDetails(db *gorm.DB) gin.HandlerFunc {
-    return func(c *gin.Context) {
-        bookingId := c.Param("id") // Use "id" instead of "bookingId"
+	return func(c *gin.Context) {
+		bookingId := c.Param("id") // Use "id" instead of "bookingId"
 
-        var booking models.Booking
-        if err := db.Preload("Ride").First(&booking, bookingId).Error; err != nil {
-            c.JSON(404, gin.H{"error": "Booking not found"})
-            return
-        }
+		var booking models.Booking
+		if err := db.Preload("Ride").First(&booking, bookingId).Error; err != nil {
+			c.JSON(404, gin.H{"error": "Booking not found"})
+			return
+		}
 
-        var parcel models.Parcel
-        if err := db.Where("ride_id = ?", booking.RideID).First(&parcel).Error; err != nil {
-            c.JSON(404, gin.H{"error": "Parcel details not found"})
-            return
-        }
+		var parcel models.Parcel
+		if err := db.Where("ride_id = ?", booking.RideID).First(&parcel).Error; err != nil {
+			c.JSON(404, gin.H{"error": "Parcel details not found"})
+			return
+		}
 
-        c.JSON(200, gin.H{
-            "parcelImage":      parcel.ParcelImage,
-            "parcelDescription": parcel.ParcelDescription,
-            "receiverName":     parcel.ReceiverName,
-            "receiverContact":  parcel.ReceiverContact,
-            "destination":      parcel.Destination,
-        })
-    }
+		c.JSON(200, gin.H{
+			"parcelImage":       parcel.ParcelImage,
+			"parcelDescription": parcel.ParcelDescription,
+			"receiverName":      parcel.ReceiverName,
+			"receiverContact":   parcel.ReceiverContact,
+			"destination":       parcel.Destination,
+		})
+	}
 }
