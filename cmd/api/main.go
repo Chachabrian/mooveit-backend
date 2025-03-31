@@ -75,22 +75,28 @@ func main() {
 
 			// Rides routes
 			rides := protected.Group("/rides")
-            {
-                rides.GET("", handlers.GetAvailableRides(db))
-                rides.POST("", handlers.CreateRide(db))
-                rides.GET("/driver", handlers.GetDriverRides(db))
-                rides.GET("/all", handlers.GetAllRides(db))
-            }
+			{
+				rides.GET("", handlers.GetAvailableRides(db))
+				rides.POST("", handlers.CreateRide(db))
+				rides.GET("/driver", handlers.GetDriverRides(db))
+				rides.GET("/all", handlers.GetAllRides(db))
+			}
 
 			// Bookings routes
 			bookings := protected.Group("/bookings")
-            {
-                bookings.POST("", handlers.CreateBooking(db))
-                bookings.GET("/:id/status", handlers.GetBookingStatus(db))
-                bookings.GET("/client", handlers.GetClientBookings(db))
-                bookings.GET("/driver", handlers.GetDriverBookings(db))
-                bookings.PATCH("/:id/status", handlers.UpdateBookingStatus(db))
-            }
+			{
+				bookings.POST("", handlers.CreateBooking(db))
+				bookings.GET("/:id/status", handlers.GetBookingStatus(db))
+				bookings.GET("/client", handlers.GetClientBookings(db))
+				bookings.GET("/driver", handlers.GetDriverBookings(db))
+				bookings.PATCH("/:id/status", handlers.UpdateBookingStatus(db))
+				bookings.GET("/:bookingId/parcel-details", handlers.GetParcelDetails(db))
+			}
+
+			parcels := protected.Group("/parcels")
+			{
+				parcels.POST("", handlers.CreateParcel(db))
+			}
 		}
 	}
 
