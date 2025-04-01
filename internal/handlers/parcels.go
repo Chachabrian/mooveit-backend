@@ -57,6 +57,13 @@ func CreateParcel(db *gorm.DB) gin.HandlerFunc {
 		// Store relative path in database
 		dbPath := filepath.Join("uploads/parcels", fileName)
 
+		 // First verify if the ride exists
+		var ride models.Ride
+		if err := db.First(&ride, input.RideID).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ride ID"})
+			return
+		}
+
 		// Create parcel record
 		parcel := models.Parcel{
 			RideID:            input.RideID,
@@ -68,7 +75,12 @@ func CreateParcel(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		if err := db.Create(&parcel).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create parcel"})
+			// Log the actual error
+			fmt.Printf("Database error: %v\n", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":   "Failed to create parcel",
+				"details": err.Error(),
+			})
 			return
 		}
 
