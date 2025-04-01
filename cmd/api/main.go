@@ -37,6 +37,9 @@ func main() {
 	// Initialize router
 	r := gin.Default()
 
+	// Serve static files
+	r.Static("/uploads", "/app/uploads")
+
 	// CORS middleware
 	r.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")

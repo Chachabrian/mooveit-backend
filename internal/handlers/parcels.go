@@ -57,7 +57,7 @@ func CreateParcel(db *gorm.DB) gin.HandlerFunc {
 		// Store relative path in database
 		dbPath := filepath.Join("uploads/parcels", fileName)
 
-		 // First verify if the ride exists
+		// First verify if the ride exists
 		var ride models.Ride
 		if err := db.First(&ride, input.RideID).Error; err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ride ID"})
@@ -90,6 +90,12 @@ func CreateParcel(db *gorm.DB) gin.HandlerFunc {
 
 func GetParcelDetails(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Get base URL from environment variable or configuration
+		baseURL := os.Getenv("BASE_URL") // e.g., "https://api.yourdomain.com"
+		if baseURL == "" {
+			baseURL = "http://localhost:8080" // fallback for development
+		}
+
 		bookingId := c.Param("id") // Use "id" instead of "bookingId"
 
 		var booking models.Booking
@@ -104,8 +110,11 @@ func GetParcelDetails(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Construct full URL for parcel image
+		fullImageURL := fmt.Sprintf("%s/%s", baseURL, parcel.ParcelImage)
+
 		c.JSON(200, gin.H{
-			"parcelImage":       parcel.ParcelImage,
+			"parcelImage":       fullImageURL,
 			"parcelDescription": parcel.ParcelDescription,
 			"receiverName":      parcel.ReceiverName,
 			"receiverContact":   parcel.ReceiverContact,

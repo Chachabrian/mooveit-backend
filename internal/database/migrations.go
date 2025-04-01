@@ -11,6 +11,7 @@ func RunMigrations(db *gorm.DB) error {
 		&models.User{},
 		&models.Booking{},
 		&models.Ride{},
+		&models.Parcel{},
 	)
 	if err != nil {
 		return err
