@@ -33,6 +33,12 @@ func CreateRide(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Check if the scheduled time is in the future
+		if input.Date.Before(time.Now()) {
+			c.JSON(400, gin.H{"error": "Ride date must be in the future"})
+			return
+		}
+
 		ride := models.Ride{
 			DriverID:        userId,
 			CurrentLocation: input.CurrentLocation,
@@ -60,7 +66,10 @@ func GetAvailableRides(db *gorm.DB) gin.HandlerFunc {
 
 		var rides []models.Ride
 		query := db.Preload("Driver").
-			Where("rides.date > ? AND rides.status = ?", time.Now(), "available")
+			Where("rides.date > ? AND rides.date <= ? AND rides.status = ?", 
+				time.Now(), 
+				time.Now().Add(24*time.Hour), 
+				"available")
 
 		if destination != "" {
 			query = query.Where("LOWER(rides.destination) LIKE LOWER(?)", "%"+strings.ToLower(destination)+"%")
@@ -84,7 +93,9 @@ func GetDriverRides(db *gorm.DB) gin.HandlerFunc {
 		userId := c.GetUint("userId")
 
 		var rides []models.Ride
-		if err := db.Where("driver_id = ?", userId).Find(&rides).Error; err != nil {
+		if err := db.Where("driver_id = ?", userId).
+			Order("date DESC").
+			Find(&rides).Error; err != nil {
 			c.JSON(500, gin.H{"error": "Failed to fetch driver rides"})
 			return
 		}
@@ -97,11 +108,44 @@ func GetDriverRides(db *gorm.DB) gin.HandlerFunc {
 func GetAllRides(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var rides []models.Ride
-		if err := db.Preload("Driver").Find(&rides).Error; err != nil {
+		if err := db.Preload("Driver").
+			Where("date > ? AND date <= ?", 
+				time.Now(), 
+				time.Now().Add(24*time.Hour)).
+			Order("date ASC").
+			Find(&rides).Error; err != nil {
 			c.JSON(500, gin.H{"error": "Failed to fetch rides"})
 			return
 		}
 
 		c.JSON(200, rides)
+	}
+}
+
+// DeleteRide soft deletes a ride
+func DeleteRide(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		rideID := c.Param("id")
+		userId := c.GetUint("userId")
+
+		var ride models.Ride
+		if err := db.First(&ride, rideID).Error; err != nil {
+			c.JSON(404, gin.H{"error": "Ride not found"})
+			return
+		}
+
+		// Check if the user is the owner of the ride
+		if ride.DriverID != userId {
+			c.JSON(403, gin.H{"error": "Unauthorized to delete this ride"})
+			return
+		}
+
+		// Soft delete the ride
+		if err := db.Delete(&ride).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to delete ride"})
+			return
+		}
+
+		c.JSON(200, gin.H{"message": "Ride successfully deleted"})
 	}
 }

@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"log"
+
 	"github.com/chachabrian/mooveit-backend/internal/models"
+	"github.com/chachabrian/mooveit-backend/pkg/utils"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -19,9 +22,26 @@ func CreateBooking(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Start a transaction
+		tx := db.Begin()
+		if tx.Error != nil {
+			c.JSON(500, gin.H{"error": "Failed to start transaction"})
+			return
+		}
+
+		// Load the ride with driver information
 		var ride models.Ride
-		if err := db.First(&ride, input.RideID).Error; err != nil {
+		if err := tx.Preload("Driver").First(&ride, input.RideID).Error; err != nil {
+			tx.Rollback()
 			c.JSON(404, gin.H{"error": "Ride not found"})
+			return
+		}
+
+		// Load the client information
+		var client models.User
+		if err := tx.First(&client, userId).Error; err != nil {
+			tx.Rollback()
+			c.JSON(404, gin.H{"error": "Client not found"})
 			return
 		}
 
@@ -31,8 +51,25 @@ func CreateBooking(db *gorm.DB) gin.HandlerFunc {
 			Status:   models.BookingStatusPending,
 		}
 
-		if err := db.Create(&booking).Error; err != nil {
+		if err := tx.Create(&booking).Error; err != nil {
+			tx.Rollback()
 			c.JSON(500, gin.H{"error": "Failed to create booking"})
+			return
+		}
+
+		// Send SMS notification to driver
+		if err := utils.SendNewBookingNotificationToDriver(
+			ride.Driver.PhoneNumber,
+			ride.Destination,
+			client.Username,
+		); err != nil {
+			// Log the error but don't fail the transaction
+			log.Printf("Failed to send SMS to driver: %v", err)
+		}
+
+		// Commit transaction
+		if err := tx.Commit().Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to commit transaction"})
 			return
 		}
 
@@ -226,12 +263,63 @@ func UpdateBookingStatus(db *gorm.DB) gin.HandlerFunc {
 				c.JSON(500, gin.H{"error": "Failed to update ride status"})
 				return
 			}
+
+			// Load necessary information for SMS
+			var client models.User
+			if err := tx.First(&client, booking.ClientID).Error; err != nil {
+				tx.Rollback()
+				c.JSON(500, gin.H{"error": "Failed to load client information"})
+				return
+			}
+
+			var driver models.User
+			if err := tx.First(&driver, booking.Ride.DriverID).Error; err != nil {
+				tx.Rollback()
+				c.JSON(500, gin.H{"error": "Failed to load driver information"})
+				return
+			}
+
+			var parcel models.Parcel
+			if err := tx.Where("ride_id = ?", booking.RideID).First(&parcel).Error; err != nil {
+				tx.Rollback()
+				c.JSON(500, gin.H{"error": "Failed to load parcel information"})
+				return
+			}
+
+			// Send SMS notifications
+			if err := utils.SendBookingAcceptedSMS(
+				client.PhoneNumber,
+				driver.Username,
+				driver.CarPlate,
+				parcel.ReceiverContact,
+				parcel.ReceiverName,
+			); err != nil {
+				// Log the error but don't fail the transaction
+				log.Printf("Failed to send SMS: %v", err)
+			}
+
 		} else if input.Status == "cancelled" || input.Status == "rejected" {
 			// Reset ride status to available if booking is cancelled or rejected
 			if err := tx.Model(&booking.Ride).Update("status", "available").Error; err != nil {
 				tx.Rollback()
 				c.JSON(500, gin.H{"error": "Failed to update ride status"})
 				return
+			}
+
+			if input.Status == "rejected" {
+				// Load client information for SMS
+				var client models.User
+				if err := tx.First(&client, booking.ClientID).Error; err != nil {
+					tx.Rollback()
+					c.JSON(500, gin.H{"error": "Failed to load client information"})
+					return
+				}
+
+				// Send rejection SMS to client
+				if err := utils.SendBookingRejectedSMS(client.PhoneNumber); err != nil {
+					// Log the error but don't fail the transaction
+					log.Printf("Failed to send rejection SMS: %v", err)
+				}
 			}
 		}
 

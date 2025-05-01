@@ -83,6 +83,7 @@ func main() {
 				rides.POST("", handlers.CreateRide(db))
 				rides.GET("/driver", handlers.GetDriverRides(db))
 				rides.GET("/all", handlers.GetAllRides(db))
+				rides.DELETE("/:id", handlers.DeleteRide(db))
 			}
 
 			// Bookings routes

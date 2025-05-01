@@ -41,7 +41,24 @@ func Register(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(201, gin.H{"message": "User created successfully"})
+		// Generate token for the newly registered user
+		token, err := utils.GenerateToken(&user)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Failed to generate token"})
+			return
+		}
+
+		c.JSON(201, gin.H{
+			"message": "User created successfully",
+			"token": token,
+			"user": gin.H{
+				"id":          user.ID,
+				"email":       user.Email,
+				"username":    user.Username,
+				"phoneNumber": user.PhoneNumber,
+				"userType":    user.UserType,
+			},
+		})
 	}
 }
 

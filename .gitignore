@@ -13,7 +13,7 @@
 
 # Dependency directories
 vendor/
-pkg/
+go/
 bin/
 
 # Go workspace file
