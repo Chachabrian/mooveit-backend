@@ -9,31 +9,20 @@ import (
 )
 
 var (
-	// Username is ALWAYS "sandbox" for test environment
 	username = os.Getenv("AT_USERNAME")
 	apiKey   = os.Getenv("AT_API_KEY")
-	env      = os.Getenv("APP_ENV")
 )
 
 func sendSMS(message string, recipients []string) error {
-	// If username is not set and we're in development, use "sandbox"
 	if username == "" {
-		if env != "production" {
-			username = "sandbox"
-		} else {
-			return fmt.Errorf("Africa's Talking username not set")
-		}
+		return fmt.Errorf("africa's talking username not set")
 	}
 
 	if apiKey == "" {
-		return fmt.Errorf("Africa's Talking API key not set")
+		return fmt.Errorf("africa's talking API key not set")
 	}
 
-	// Determine the API endpoint based on environment
 	baseURL := "https://api.africastalking.com/version1/messaging"
-	if env != "production" {
-		baseURL = "https://api.sandbox.africastalking.com/version1/messaging"
-	}
 
 	// Prepare the form data
 	data := url.Values{}
@@ -69,19 +58,19 @@ func sendSMS(message string, recipients []string) error {
 }
 
 func SendNewBookingNotificationToDriver(driverPhone, destination, clientName string) error {
-	msg := fmt.Sprintf("Your ride to %s has been booked by %s. Please log in to accept or reject the booking.", 
+	msg := fmt.Sprintf("Your ride to %s has been booked by %s. Please log in to accept or reject the booking.",
 		destination, clientName)
-	
+
 	return sendSMS(msg, []string{driverPhone})
 }
 
 func SendBookingAcceptedSMS(clientPhone, driverName, carPlate, receiverPhone, receiverName string) error {
 	// Message to client
-	clientMsg := fmt.Sprintf("Your booking has been accepted by driver %s (Car: %s). Your parcel is now ready for delivery.", 
+	clientMsg := fmt.Sprintf("Your booking has been accepted by driver %s (Car: %s). Your parcel is now ready for delivery.",
 		driverName, carPlate)
-	
+
 	// Message to receiver
-	receiverMsg := fmt.Sprintf("Hello %s, a parcel is being delivered to you by %s (Car: %s). You will be notified when the parcel arrives.", 
+	receiverMsg := fmt.Sprintf("Hello %s, a parcel is being delivered to you by %s (Car: %s). You will be notified when the parcel arrives.",
 		receiverName, driverName, carPlate)
 
 	// Send to client
@@ -100,4 +89,4 @@ func SendBookingAcceptedSMS(clientPhone, driverName, carPlate, receiverPhone, re
 func SendBookingRejectedSMS(clientPhone string) error {
 	msg := "Your booking has been rejected by the driver. Please try booking another available ride."
 	return sendSMS(msg, []string{clientPhone})
-} 
+}

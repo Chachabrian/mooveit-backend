@@ -35,7 +35,7 @@ services:
       - PORT=8080
       - BASE_URL=http://54.175.247.226:8080/api
       - GIN_MODE=release
-      - AT_API_KEY=${AT_API_KEY}
+      - AT_API_KEY=atsk_75abb9d3046c9b32b8761828b1e398082421cbabe0f7dd9ea2bc37e7b254ad14876702f9
       - AT_USERNAME=MooveIt_KE
     ports:
       - "8080:8080"
