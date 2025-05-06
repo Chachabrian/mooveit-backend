@@ -19,6 +19,7 @@ func CreateParcel(db *gorm.DB) gin.HandlerFunc {
 			ParcelDescription string `form:"parcelDescription" binding:"required"`
 			ReceiverName      string `form:"receiverName" binding:"required"`
 			ReceiverContact   string `form:"receiverContact" binding:"required"`
+			ReceiverEmail     string `form:"receiverEmail" binding:"required,email"`
 			Destination       string `form:"destination" binding:"required"`
 		}
 
@@ -71,6 +72,7 @@ func CreateParcel(db *gorm.DB) gin.HandlerFunc {
 			ParcelDescription: input.ParcelDescription,
 			ReceiverName:      input.ReceiverName,
 			ReceiverContact:   input.ReceiverContact,
+			ReceiverEmail:     input.ReceiverEmail,
 			Destination:       input.Destination,
 		}
 

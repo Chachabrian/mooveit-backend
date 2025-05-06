@@ -34,12 +34,14 @@ RUN adduser -D appuser
 
 WORKDIR /app
 
-# Create uploads directory with proper permissions
-RUN mkdir -p /app/uploads/parcels && chown -R appuser:appuser /app/uploads
+# Create required directories with proper permissions
+RUN mkdir -p /app/uploads/parcels /app/static/images && \
+    chown -R appuser:appuser /app
 
-# Copy binary from builder
+# Copy binary and static files from builder
 COPY --from=builder /go/src/github.com/chachabrian/mooveit-backend/main .
 COPY --from=builder /go/src/github.com/chachabrian/mooveit-backend/.env.production .env
+COPY --from=builder /go/src/github.com/chachabrian/mooveit-backend/static/images/logo.png /app/static/images/
 
 # Use non-root user
 USER appuser

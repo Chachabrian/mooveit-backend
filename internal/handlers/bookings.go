@@ -57,7 +57,7 @@ func CreateBooking(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Send SMS notification to driver
+		// Send notifications to driver
 		if err := utils.SendNewBookingNotificationToDriver(
 			ride.Driver.PhoneNumber,
 			ride.Destination,
@@ -65,6 +65,15 @@ func CreateBooking(db *gorm.DB) gin.HandlerFunc {
 		); err != nil {
 			// Log the error but don't fail the transaction
 			log.Printf("Failed to send SMS to driver: %v", err)
+		}
+
+		if err := utils.SendNewBookingNotificationEmailToDriver(
+			ride.Driver.Email,
+			ride.Destination,
+			client.Username,
+		); err != nil {
+			// Log the error but don't fail the transaction
+			log.Printf("Failed to send email to driver: %v", err)
 		}
 
 		// Commit transaction
@@ -264,7 +273,7 @@ func UpdateBookingStatus(db *gorm.DB) gin.HandlerFunc {
 				return
 			}
 
-			// Load necessary information for SMS
+			// Load necessary information for notifications
 			var client models.User
 			if err := tx.First(&client, booking.ClientID).Error; err != nil {
 				tx.Rollback()
@@ -298,6 +307,18 @@ func UpdateBookingStatus(db *gorm.DB) gin.HandlerFunc {
 				log.Printf("Failed to send SMS: %v", err)
 			}
 
+			// Send email notifications
+			if err := utils.SendBookingAcceptedEmail(
+				client.Email,
+				driver.Username,
+				driver.CarPlate,
+				parcel.ReceiverEmail,
+				parcel.ReceiverName,
+			); err != nil {
+				// Log the error but don't fail the transaction
+				log.Printf("Failed to send email: %v", err)
+			}
+
 		} else if input.Status == "cancelled" || input.Status == "rejected" {
 			// Reset ride status to available if booking is cancelled or rejected
 			if err := tx.Model(&booking.Ride).Update("status", "available").Error; err != nil {
@@ -307,7 +328,7 @@ func UpdateBookingStatus(db *gorm.DB) gin.HandlerFunc {
 			}
 
 			if input.Status == "rejected" {
-				// Load client information for SMS
+				// Load client information for notifications
 				var client models.User
 				if err := tx.First(&client, booking.ClientID).Error; err != nil {
 					tx.Rollback()
@@ -315,10 +336,15 @@ func UpdateBookingStatus(db *gorm.DB) gin.HandlerFunc {
 					return
 				}
 
-				// Send rejection SMS to client
+				// Send rejection notifications
 				if err := utils.SendBookingRejectedSMS(client.PhoneNumber); err != nil {
 					// Log the error but don't fail the transaction
 					log.Printf("Failed to send rejection SMS: %v", err)
+				}
+
+				if err := utils.SendBookingRejectedEmail(client.Email); err != nil {
+					// Log the error but don't fail the transaction
+					log.Printf("Failed to send rejection email: %v", err)
 				}
 			}
 		}

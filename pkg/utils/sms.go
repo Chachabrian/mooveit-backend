@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,6 +15,8 @@ var (
 )
 
 func sendSMS(message string, recipients []string) error {
+	log.Printf("Attempting to send SMS. Username: %s, APIKey length: %d", username, len(apiKey))
+	
 	if username == "" {
 		return fmt.Errorf("africa's talking username not set")
 	}
@@ -23,6 +26,8 @@ func sendSMS(message string, recipients []string) error {
 	}
 
 	baseURL := "https://api.africastalking.com/version1/messaging"
+	log.Printf("Sending SMS to recipients: %v", recipients)
+	log.Printf("Message content: %s", message)
 
 	// Prepare the form data
 	data := url.Values{}
@@ -43,6 +48,7 @@ func sendSMS(message string, recipients []string) error {
 
 	// Send the request
 	client := &http.Client{}
+	log.Printf("Sending HTTP request to Africa's Talking API...")
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send request: %v", err)
@@ -50,10 +56,12 @@ func sendSMS(message string, recipients []string) error {
 	defer resp.Body.Close()
 
 	// Check response status
+	log.Printf("Received response with status code: %d", resp.StatusCode)
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to send SMS: status code %d", resp.StatusCode)
 	}
 
+	log.Printf("Successfully sent SMS to recipients")
 	return nil
 }
 

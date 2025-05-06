@@ -9,6 +9,7 @@ type Parcel struct {
 	ParcelDescription string `gorm:"not null"`
 	ReceiverName      string `gorm:"not null"`
 	ReceiverContact   string `gorm:"not null"`
+	ReceiverEmail     string `gorm:"not null"`
 	Destination       string `gorm:"not null"`
 	Ride              Ride   `gorm:"foreignKey:RideID"`
 }
