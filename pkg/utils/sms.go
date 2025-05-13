@@ -98,3 +98,8 @@ func SendBookingRejectedSMS(clientPhone string) error {
 	msg := "Your booking has been rejected by the driver. Please try booking another available ride."
 	return sendSMS(msg, []string{clientPhone})
 }
+
+func SendPasswordResetSMS(userPhone, otp string) error {
+	msg := fmt.Sprintf("Your MooveIt 4-digit password reset OTP is: %s. This code will expire in 15 minutes.", otp)
+	return sendSMS(msg, []string{userPhone})
+}

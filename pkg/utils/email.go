@@ -157,4 +157,22 @@ func SendBookingRejectedEmail(clientEmail string) error {
 				</div>`+emailFooter,
 		baseURL)
 	return sendEmail([]string{clientEmail}, subject, body)
+}
+
+func SendPasswordResetEmail(userEmail, otp string) error {
+	subject := "Password Reset OTP - MooveIt"
+	body := fmt.Sprintf(emailHeader+`
+				<div style="background-color: #f9f9f9; padding: 20px; border-radius: 5px;">
+					<h1 style="color: #2c3e50; text-align: center;">Password Reset</h1>
+					<p>Hello,</p>
+					<p>We received a request to reset your password for your MooveIt account.</p>
+					<p>Your 4-digit one-time password (OTP) for password reset is:</p>
+					<div style="text-align: center; margin: 20px 0; padding: 10px; background-color: #eee; font-size: 28px; font-weight: bold; letter-spacing: 8px;">
+						%s
+					</div>
+					<p>This OTP will expire in 15 minutes. If you did not request this reset, please ignore this email.</p>
+					<p>Best regards,<br>The MooveIt Team</p>
+				</div>`+emailFooter,
+		baseURL, otp)
+	return sendEmail([]string{userEmail}, subject, body)
 } 

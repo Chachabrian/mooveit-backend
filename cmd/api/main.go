@@ -56,6 +56,9 @@ func main() {
 		{
 			auth.POST("/register", handlers.Register(db))
 			auth.POST("/login", handlers.Login(db))
+			auth.POST("/forgot-password", handlers.RequestPasswordReset(db))
+			auth.POST("/verify-otp", handlers.VerifyOTP(db))
+			auth.POST("/reset-password", handlers.ResetPassword(db))
 		}
 
 		// Protected routes

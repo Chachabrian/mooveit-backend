@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"fmt"
 	"github.com/chachabrian/mooveit-backend/internal/models"
 	"github.com/chachabrian/mooveit-backend/pkg/utils"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
+	"time"
 )
 
 type LoginInput struct {
@@ -105,5 +107,157 @@ func Login(db *gorm.DB) gin.HandlerFunc {
 				"userType":    user.UserType,
 			},
 		})
+	}
+}
+
+// ResetPasswordRequestInput defines the input for requesting a password reset
+type ResetPasswordRequestInput struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+// RequestPasswordReset initiates the password reset process
+func RequestPasswordReset(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input ResetPasswordRequestInput
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Find user by email
+		var user models.User
+		if result := db.Where("email = ?", input.Email).First(&user); result.Error != nil {
+			c.JSON(404, gin.H{"error": "User not found"})
+			return
+		}
+
+		// First, invalidate all previous unused OTPs for this user
+		if result := db.Model(&models.OTP{}).
+			Where("user_id = ? AND type = ? AND used = ? AND expires_at > ?", 
+				user.ID, models.OTPTypePasswordReset, false, time.Now()).
+			Update("used", true); result.Error != nil {
+			c.JSON(500, gin.H{"error": "Failed to invalidate previous OTPs"})
+			return
+		}
+
+		// Generate a unique OTP with timestamp for this reset request
+		// This adds randomness to make each OTP request unique
+		timestamp := time.Now().Format("20060102150405")
+		uniqueKey := fmt.Sprintf("%s-%s", input.Email, timestamp)
+		otp := utils.GenerateOTP(uniqueKey)
+		
+		// Save OTP in database
+		otpRecord := models.OTP{
+			UserID:    user.ID,
+			Code:      otp,
+			Type:      models.OTPTypePasswordReset,
+			ExpiresAt: time.Now().Add(utils.OTPExpiration),
+		}
+		
+		if result := db.Create(&otpRecord); result.Error != nil {
+			c.JSON(500, gin.H{"error": "Failed to generate OTP"})
+			return
+		}
+
+		// Send OTP via email and SMS
+		if err := utils.SendPasswordResetOTP(user.Email, user.PhoneNumber, otp); err != nil {
+			c.JSON(500, gin.H{"error": "Failed to send OTP: " + err.Error()})
+			return
+		}
+
+		c.JSON(200, gin.H{"message": "Password reset OTP sent successfully"})
+	}
+}
+
+// VerifyOTPInput defines the input for verifying OTP
+type VerifyOTPInput struct {
+	Email string `json:"email" binding:"required,email"`
+	OTP   string `json:"otp" binding:"required"`
+}
+
+// ResetPasswordInput defines the input for resetting password
+type ResetPasswordInput struct {
+	Email       string `json:"email" binding:"required,email"`
+	OTP         string `json:"otp" binding:"required"`
+	NewPassword string `json:"newPassword" binding:"required,min=6"`
+}
+
+// ResetPassword resets the user's password after OTP verification
+func ResetPassword(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input ResetPasswordInput
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Find user by email
+		var user models.User
+		if result := db.Where("email = ?", input.Email).First(&user); result.Error != nil {
+			c.JSON(404, gin.H{"error": "User not found"})
+			return
+		}
+
+		// Find valid OTP
+		var otpRecord models.OTP
+		if result := db.Where("user_id = ? AND code = ? AND type = ? AND used = ? AND expires_at > ?", 
+			user.ID, input.OTP, models.OTPTypePasswordReset, false, time.Now()).
+			First(&otpRecord); result.Error != nil {
+			c.JSON(400, gin.H{"error": "Invalid or expired OTP"})
+			return
+		}
+
+		// Immediately mark OTP as used to prevent race conditions
+		if err := db.Model(&models.OTP{}).Where("id = ?", otpRecord.ID).Update("used", true).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to mark OTP as used"})
+			return
+		}
+
+		// Hash the new password
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.NewPassword), bcrypt.DefaultCost)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Failed to hash password"})
+			return
+		}
+
+		// Update user password
+		user.PasswordHash = string(hashedPassword)
+		if result := db.Save(&user); result.Error != nil {
+			c.JSON(500, gin.H{"error": "Failed to update password"})
+			return
+		}
+
+		c.JSON(200, gin.H{"message": "Password reset successful"})
+	}
+}
+
+// VerifyOTP verifies if an OTP is valid
+func VerifyOTP(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input VerifyOTPInput
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Find user by email
+		var user models.User
+		if result := db.Where("email = ?", input.Email).First(&user); result.Error != nil {
+			c.JSON(404, gin.H{"error": "User not found"})
+			return
+		}
+
+		// Find valid OTP
+		var otpRecord models.OTP
+		if result := db.Where("user_id = ? AND code = ? AND type = ? AND used = ? AND expires_at > ?", 
+			user.ID, input.OTP, models.OTPTypePasswordReset, false, time.Now()).
+			First(&otpRecord); result.Error != nil {
+			c.JSON(400, gin.H{"error": "Invalid or expired OTP"})
+			return
+		}
+
+		// OTP is valid but we don't mark it as used yet
+		// It will be used during the actual password reset
+		c.JSON(200, gin.H{"message": "OTP verified successfully", "valid": true})
 	}
 }
