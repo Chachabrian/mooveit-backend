@@ -34,7 +34,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
       - PORT=8080
-      - BASE_URL=http://54.175.247.226:8080/api
+      - BASE_URL=http://34.28.181.36:8080/api
       - GIN_MODE=release
       - AT_API_KEY=atsk_1b57803c1c0b358a847983f05e56c3db08864fb38aaead5332edddf47c287a75b395ec6c
       - AT_USERNAME=MooveIt_KE
