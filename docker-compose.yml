@@ -29,9 +29,7 @@ services:
     restart: always
     profiles: ["app", "full"]
     depends_on:
-      postgres:
-        condition: service_healthy
-        required: false
+      - postgres
     environment:
       - DB_HOST=${DB_HOST:-postgres}
       - DB_PORT=${DB_PORT:-5432}
@@ -39,15 +37,15 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
       - PORT=${PORT:-8080}
-      - BASE_URL=${BASE_URL}
+      - BASE_URL=${BASE_URL:-http://localhost:8080/api}
       - GIN_MODE=${GIN_MODE:-release}
-      - AT_API_KEY=${AT_API_KEY}
-      - AT_USERNAME=${AT_USERNAME}
+      - AT_API_KEY=${AT_API_KEY:-atsk_75abb9d3046c9b32b8761828b1e398082421cbabe0f7dd9ea2bc37e7b254ad14876702f9}
+      - AT_USERNAME=${AT_USERNAME:-MooveIt_KE}
       - EMAIL_PASSWORD=${EMAIL_PASSWORD:-ojtx esuf bizk slbh}
       - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
       - SMTP_PORT=${SMTP_PORT:-587}
       - EMAIL_FROM=${EMAIL_FROM:-mooveitlimited@gmail.com}
-      - JWT_SECRET=${JWT_SECRET}
+      - JWT_SECRET=${JWT_SECRET:-w1yN8qcCFc0cLx5fjb/7Se3DH839c67h53cBndor5Mc=}
     ports:
       - "${PORT:-8080}:8080"
     volumes:
@@ -79,9 +77,7 @@ services:
       retries: 3
       start_period: 2m
     depends_on:
-      postgres:
-        condition: service_healthy
-        required: false
+      - postgres
     volumes:
       - metabase_data:/metabase-data
     networks:
