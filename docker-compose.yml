@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
     ports:
-      - "0.0.0.0:5432:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init-metabase-db.sh:/docker-entrypoint-initdb.d/init-metabase-db.sh
@@ -43,16 +43,17 @@ services:
       - SMTP_PORT=587
       - EMAIL_FROM=mooveitlimited@gmail.com
     ports:
-      - "0.0.0.0:8080:8080"
+      - "8080:8080"
     volumes:
       - uploads_data:/app/uploads
+
   
   metabase:
     image: metabase/metabase:latest
     container_name: metabase
     restart: always
     ports:
-      - "0.0.0.0:3000:3000"
+      - "3000:3000"
     environment:
       MB_DB_TYPE: postgres
       MB_DB_DBNAME: metabase
