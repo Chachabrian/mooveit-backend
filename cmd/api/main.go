@@ -105,7 +105,8 @@ func main() {
 		port = "8080"
 	}
 
-	if err := r.Run(":" + port); err != nil {
+	// Fix: Explicitly bind to all network interfaces
+	if err := r.Run("0.0.0.0:" + port); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
 }
