@@ -28,8 +28,7 @@ services:
     container_name: go-app
     restart: always
     profiles: ["app", "full"]
-    depends_on:
-      - postgres
+    # No depends_on for the app profile when deployed on VM2
     environment:
       - DB_HOST=${DB_HOST:-postgres}
       - DB_PORT=${DB_PORT:-5432}
