@@ -34,7 +34,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
       - PORT=8080
-      - BASE_URL=http://3.91.202.151:8080/api
+      - BASE_URL=http://34.28.181.36:8080/api
       - GIN_MODE=release
       - AT_API_KEY=atsk_1b57803c1c0b358a847983f05e56c3db08864fb38aaead5332edddf47c287a75b395ec6c
       - AT_USERNAME=MooveIt_KE
@@ -48,35 +48,35 @@ services:
       - uploads_data:/app/uploads
 
   
-  # metabase:
-  #   image: metabase/metabase:latest
-  #   container_name: metabase
-  #   restart: always
-  #   ports:
-  #     - "3000:3000"
-  #   environment:
-  #     MB_DB_TYPE: postgres
-  #     MB_DB_DBNAME: metabase
-  #     MB_DB_PORT: 5432
-  #     MB_DB_USER: ${DB_USER}
-  #     MB_DB_PASS: ${DB_PASSWORD}
-  #     MB_DB_HOST: postgres
-  #     JAVA_TIMEZONE: Africa/Nairobi
-  #     JAVA_OPTS: "-XX:+UnlockExperimentalVMOptions -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
-  #     MB_ENCRYPTION_SECRET_KEY: UqHJzl1rBN3FSL2p4keudxY5DI7KaGMm
-  #   healthcheck:
-  #     test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
-  #     interval: 1m
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 2m
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #   volumes:
-  #     - metabase_data:/metabase-data
+  metabase:
+    image: metabase/metabase:latest
+    container_name: metabase
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: metabase
+      MB_DB_PORT: 5432
+      MB_DB_USER: ${DB_USER}
+      MB_DB_PASS: ${DB_PASSWORD}
+      MB_DB_HOST: postgres
+      JAVA_TIMEZONE: Africa/Nairobi
+      JAVA_OPTS: "-XX:+UnlockExperimentalVMOptions -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+      MB_ENCRYPTION_SECRET_KEY: UqHJzl1rBN3FSL2p4keudxY5DI7KaGMm
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 2m
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - metabase_data:/metabase-data
 
 volumes:
   postgres_data:
   uploads_data:
-  # metabase_data:
+  metabase_data:
