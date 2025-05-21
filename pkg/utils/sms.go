@@ -9,12 +9,13 @@ import (
 	"strings"
 )
 
-var (
-	username = os.Getenv("AT_USERNAME")
-	apiKey   = os.Getenv("AT_API_KEY")
-)
-
+// We'll load credentials dynamically when sending SMS to ensure
+// they're available at runtime rather than just at init time
 func sendSMS(message string, recipients []string) error {
+	// Load credentials dynamically each time we send an SMS
+	username := os.Getenv("AT_USERNAME")
+	apiKey := os.Getenv("AT_API_KEY")
+	
 	log.Printf("Attempting to send SMS. Username: %s, APIKey length: %d", username, len(apiKey))
 	
 	if username == "" {
@@ -43,7 +44,7 @@ func sendSMS(message string, recipients []string) error {
 
 	// Set headers
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("apiKey", apiKey)
+	req.Header.Set("apiKey", apiKey) // Using the dynamically loaded apiKey
 	req.Header.Set("Accept", "application/json")
 
 	// Send the request
