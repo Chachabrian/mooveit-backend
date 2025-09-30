@@ -155,7 +155,7 @@ func SendBookingRejectedEmail(clientEmail string) error {
 					</div>
 					<p>Best regards,<br>The MooveIt Team</p>
 				</div>`+emailFooter,
-		baseURL)
+		baseURL, baseURL)
 	return sendEmail([]string{clientEmail}, subject, body)
 }
 
@@ -175,4 +175,23 @@ func SendPasswordResetEmail(userEmail, otp string) error {
 				</div>`+emailFooter,
 		baseURL, otp)
 	return sendEmail([]string{userEmail}, subject, body)
-} 
+}
+
+func SendEmailVerificationOTP(userEmail, otp string) error {
+	subject := "Email Verification - MooveIt"
+	body := fmt.Sprintf(emailHeader+`
+				<div style="background-color: #f9f9f9; padding: 20px; border-radius: 5px;">
+					<h1 style="color: #2c3e50; text-align: center;">Verify Your Email</h1>
+					<p>Hello,</p>
+					<p>Thank you for registering with MooveIt! To complete your registration, please verify your email address.</p>
+					<p>Your 4-digit email verification code is:</p>
+					<div style="text-align: center; margin: 20px 0; padding: 10px; background-color: #eee; font-size: 28px; font-weight: bold; letter-spacing: 8px;">
+						%s
+					</div>
+					<p>This verification code will expire in 15 minutes.</p>
+					<p>If you did not create this account, please ignore this email.</p>
+					<p>Best regards,<br>The MooveIt Team</p>
+				</div>`+emailFooter,
+		baseURL, otp)
+	return sendEmail([]string{userEmail}, subject, body)
+}

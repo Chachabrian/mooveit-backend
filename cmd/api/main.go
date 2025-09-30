@@ -8,6 +8,7 @@ import (
 	"github.com/chachabrian/mooveit-backend/internal/database"
 	"github.com/chachabrian/mooveit-backend/internal/handlers"
 	"github.com/chachabrian/mooveit-backend/internal/middleware"
+	"github.com/chachabrian/mooveit-backend/internal/services"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -35,6 +36,15 @@ func main() {
 	sqlDB.SetMaxOpenConns(100)
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
+	// Initialize Redis
+	if err := services.InitRedis(); err != nil {
+		log.Fatalf("Failed to initialize Redis: %v", err)
+	}
+
+	// Initialize WebSocket hub
+	hub := services.NewHub()
+	go hub.Run()
+
 	// Initialize router
 	r := gin.Default()
 
@@ -56,10 +66,14 @@ func main() {
 		{
 			auth.POST("/register", handlers.Register(db))
 			auth.POST("/login", handlers.Login(db))
+			auth.POST("/verify-email", handlers.VerifyEmail(db))
 			auth.POST("/forgot-password", handlers.RequestPasswordReset(db))
 			auth.POST("/verify-otp", handlers.VerifyOTP(db))
 			auth.POST("/reset-password", handlers.ResetPassword(db))
 		}
+
+		// WebSocket connection
+		api.GET("/ws", middleware.AuthMiddleware(), handlers.WebSocketHandler(hub))
 
 		// Protected routes
 		protected := api.Group("/")
@@ -72,6 +86,19 @@ func main() {
 				users.PUT("/profile", handlers.UpdateProfile(db))
 			}
 
+			// Driver location and availability routes
+			driver := protected.Group("/driver")
+			{
+				driver.POST("/location", handlers.UpdateDriverLocation(db, hub))
+				driver.POST("/availability", handlers.UpdateDriverAvailability(db))
+				driver.GET("/status", handlers.GetDriverStatus(db))
+				driver.GET("/assigned-rides", handlers.GetDriverAssignedRides(db))
+				driver.POST("/rides/:rideId/accept", handlers.AcceptRide(db, hub))
+				driver.POST("/rides/:rideId/reject", handlers.RejectRide(db, hub))
+				driver.POST("/rides/:rideId/start", handlers.StartRide(db, hub))
+				driver.GET("/trip-history", handlers.GetDriverTripHistory(db))
+			}
+
 			// Rides routes
 			rides := protected.Group("/rides")
 			{
@@ -80,6 +107,25 @@ func main() {
 				rides.GET("/driver", handlers.GetDriverRides(db))
 				rides.GET("/all", handlers.GetAllRides(db))
 				rides.DELETE("/:id", handlers.DeleteRide(db))
+				rides.GET("/nearby-drivers", handlers.GetNearbyDrivers(db))
+				rides.POST("/request", handlers.RequestRide(db, hub))
+				rides.POST("/:rideId/cancel", handlers.CancelRide(db, hub))
+				rides.GET("/:rideId/status", handlers.GetRideStatus(db))
+				rides.PATCH("/:rideId/status", handlers.UpdateRideStatus(db, hub))
+				rides.POST("/:rideId/complete", handlers.CompleteTrip(db, hub))
+				rides.GET("/:rideId/completion", handlers.GetTripCompletion(db))
+				rides.POST("/:rideId/rate", handlers.RateTrip(db))
+				rides.GET("/trip-history", handlers.GetClientTripHistory(db))
+			}
+
+			// Pricing routes
+			pricing := protected.Group("/pricing")
+			{
+				pricing.POST("/zones", handlers.CreatePricingZone(db))
+				pricing.GET("/zones", handlers.GetPricingZones(db))
+				pricing.POST("/driver", handlers.SetDriverPricing(db))
+				pricing.GET("/driver", handlers.GetDriverPricing(db))
+				pricing.GET("/calculate", handlers.CalculateFare(db))
 			}
 
 			// Bookings routes

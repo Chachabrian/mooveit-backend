@@ -1,46 +1,53 @@
-
 package middleware
 
 import (
-    "strings"
+	"strings"
 
-    "github.com/gin-gonic/gin"
-    "github.com/golang-jwt/jwt/v5"  // Add this import
-    "github.com/chachabrian/mooveit-backend/pkg/utils"
+	"github.com/chachabrian/mooveit-backend/pkg/utils"
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5" // Add this import
 )
 
 func AuthMiddleware() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        authHeader := c.GetHeader("Authorization")
-        if authHeader == "" {
-            c.JSON(401, gin.H{"error": "Authorization header required"})
-            c.Abort()
-            return
-        }
+	return func(c *gin.Context) {
+		var tokenString string
 
-        parts := strings.Split(authHeader, " ")
-        if len(parts) != 2 || parts[0] != "Bearer" {
-            c.JSON(401, gin.H{"error": "Invalid authorization header format"})
-            c.Abort()
-            return
-        }
+		// First try to get token from Authorization header
+		authHeader := c.GetHeader("Authorization")
+		if authHeader != "" {
+			parts := strings.Split(authHeader, " ")
+			if len(parts) == 2 && parts[0] == "Bearer" {
+				tokenString = parts[1]
+			}
+		}
 
-        token, err := utils.ValidateToken(parts[1])
-        if err != nil || !token.Valid {
-            c.JSON(401, gin.H{"error": "Invalid token"})
-            c.Abort()
-            return
-        }
+		// If not found in header, try query parameter (for WebSocket)
+		if tokenString == "" {
+			tokenString = c.Query("token")
+		}
 
-        claims, ok := token.Claims.(jwt.MapClaims)
-        if !ok {
-            c.JSON(401, gin.H{"error": "Invalid token claims"})
-            c.Abort()
-            return
-        }
+		if tokenString == "" {
+			c.JSON(401, gin.H{"error": "Authorization header or token query parameter required"})
+			c.Abort()
+			return
+		}
 
-        c.Set("userId", uint(claims["id"].(float64)))
-        c.Set("userType", claims["userType"].(string))
-        c.Next()
-    }
+		token, err := utils.ValidateToken(tokenString)
+		if err != nil || !token.Valid {
+			c.JSON(401, gin.H{"error": "Invalid token"})
+			c.Abort()
+			return
+		}
+
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			c.JSON(401, gin.H{"error": "Invalid token claims"})
+			c.Abort()
+			return
+		}
+
+		c.Set("userId", uint(claims["id"].(float64)))
+		c.Set("userType", claims["userType"].(string))
+		c.Next()
+	}
 }

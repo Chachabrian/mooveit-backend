@@ -10,7 +10,8 @@ import (
 type OTPType string
 
 const (
-	OTPTypePasswordReset OTPType = "password_reset"
+	OTPTypePasswordReset     OTPType = "password_reset"
+	OTPTypeEmailVerification OTPType = "email_verification"
 )
 
 // OTP model for storing one-time passwords
@@ -32,4 +33,4 @@ func (o *OTP) IsValid() bool {
 func (o *OTP) MarkAsUsed(db *gorm.DB) error {
 	o.Used = true
 	return db.Save(o).Error
-} 
+}

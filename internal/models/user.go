@@ -16,10 +16,11 @@ type User struct {
 	gorm.Model
 	Username     string   `gorm:"column:username;unique;not null"`
 	Email        string   `gorm:"column:email;unique;not null"`
-	Password     string    `gorm:"-"`
+	Password     string   `gorm:"-"`
 	PasswordHash string   `gorm:"column:password_hash;not null"`
 	PhoneNumber  string   `gorm:"column:phone_number"`
 	UserType     UserType `gorm:"column:user_type;type:text;check:user_type IN ('client', 'driver');not null"`
+	IsVerified   bool     `gorm:"column:is_verified;default:false"`
 	CarPlate     string   `gorm:"column:car_plate"`
 	CarMake      string   `gorm:"column:car_make"`
 	CarColor     string   `gorm:"column:car_color"`

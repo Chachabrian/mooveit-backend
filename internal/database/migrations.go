@@ -13,6 +13,12 @@ func RunMigrations(db *gorm.DB) error {
 		&models.Ride{},
 		&models.Parcel{},
 		&models.OTP{},
+		&models.DriverLocation{},
+		&models.RideRequest{},
+		&models.DriverRating{},
+		&models.PricingZone{},
+		&models.DriverPricing{},
+		&models.TripCompletion{},
 	)
 	if err != nil {
 		return err
@@ -25,6 +31,7 @@ func RunMigrations(db *gorm.DB) error {
 			"ADD COLUMN IF NOT EXISTS car_make text DEFAULT ''",
 			"ADD COLUMN IF NOT EXISTS car_color text DEFAULT ''",
 			"ADD COLUMN IF NOT EXISTS user_type text DEFAULT 'client'",
+			"ADD COLUMN IF NOT EXISTS is_verified boolean DEFAULT false",
 		}
 
 		for _, column := range columns {
