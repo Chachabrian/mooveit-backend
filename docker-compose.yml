@@ -3,6 +3,7 @@ services:
     image: redis:7-alpine
     container_name: redis-cache
     restart: always
+    profiles: ["app", "redis", "full"]
     ports:
       - "6379:6379"
     volumes:
@@ -19,6 +20,7 @@ services:
       dockerfile: Dockerfile
     container_name: go-app
     restart: always
+    profiles: ["app", "full"]
     depends_on:
       - redis
     environment:
