@@ -225,6 +225,107 @@ func GetDriverAssignedRides(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
+// DriverArrived allows driver to mark that they have arrived at pickup location
+func DriverArrived(db *gorm.DB, hub *services.Hub) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		rideIDStr := c.Param("rideId")
+		driverID := c.GetUint("userId")
+		userType := c.GetString("userType")
+
+		if userType != string(models.UserTypeDriver) {
+			c.JSON(403, gin.H{"error": "Only drivers can mark arrival"})
+			return
+		}
+
+		rideID, err := strconv.ParseUint(rideIDStr, 10, 32)
+		if err != nil {
+			c.JSON(400, gin.H{"error": "Invalid ride ID"})
+			return
+		}
+
+		var rideRequest models.RideRequest
+		if err := db.Preload("Client").First(&rideRequest, rideID).Error; err != nil {
+			c.JSON(404, gin.H{"error": "Ride not found"})
+			return
+		}
+
+		// Check if driver is assigned to this ride
+		if rideRequest.DriverID == nil || *rideRequest.DriverID != driverID {
+			c.JSON(403, gin.H{"error": "Unauthorized to update this ride"})
+			return
+		}
+
+		// Check if ride is in accepted status
+		if rideRequest.Status != models.RideStatusAccepted {
+			c.JSON(400, gin.H{"error": "Ride must be accepted before marking arrival"})
+			return
+		}
+
+		// Update ride status to arrived
+		rideRequest.Status = models.RideStatusArrived
+		if err := db.Save(&rideRequest).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to update ride status"})
+			return
+		}
+
+		// Get client and driver information for notifications
+		var client models.User
+		if err := db.Where("id = ?", rideRequest.ClientID).First(&client).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to get client information"})
+			return
+		}
+
+		var driver models.User
+		if err := db.Where("id = ?", driverID).First(&driver).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to get driver information"})
+			return
+		}
+
+		// Notify client that driver has arrived
+		arrived := services.DriverArrived{
+			RideID:   rideRequest.ID,
+			DriverID: driverID,
+		}
+		hub.SendDriverArrived(rideRequest.ClientID, arrived)
+
+		// Also send a general status update notification
+		statusUpdate := services.WebSocketMessage{
+			Type: "driver_arrived",
+			Data: gin.H{
+				"rideId":     rideRequest.ID,
+				"driverId":   driverID,
+				"driverName": driver.Username,
+				"status":     rideRequest.Status,
+				"message":    "Driver has arrived at pickup location",
+			},
+		}
+
+		notificationData, _ := json.Marshal(statusUpdate)
+		hub.BroadcastToUser(rideRequest.ClientID, notificationData)
+
+		// Notify driver
+		driverNotification := services.WebSocketMessage{
+			Type: "arrival_confirmed",
+			Data: gin.H{
+				"rideId":     rideRequest.ID,
+				"clientId":   rideRequest.ClientID,
+				"clientName": client.Username,
+				"status":     rideRequest.Status,
+				"message":    "You have arrived at pickup location",
+			},
+		}
+
+		driverData, _ := json.Marshal(driverNotification)
+		hub.BroadcastToUser(driverID, driverData)
+
+		c.JSON(200, gin.H{
+			"message": "Driver arrival confirmed successfully",
+			"rideId":  rideRequest.ID,
+			"status":  rideRequest.Status,
+		})
+	}
+}
+
 // StartRide allows driver to start a ride (arrived at pickup)
 func StartRide(db *gorm.DB, hub *services.Hub) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -268,18 +369,55 @@ func StartRide(db *gorm.DB, hub *services.Hub) gin.HandlerFunc {
 			return
 		}
 
-		// Notify client that driver has arrived
-		arrived := services.DriverArrived{
+		// Get client and driver information for notifications
+		var client models.User
+		if err := db.Where("id = ?", rideRequest.ClientID).First(&client).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to get client information"})
+			return
+		}
+
+		var driver models.User
+		if err := db.Where("id = ?", driverID).First(&driver).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to get driver information"})
+			return
+		}
+
+		// Notify client that ride has started
+		started := services.RideStarted{
 			RideID:   rideRequest.ID,
 			DriverID: driverID,
 		}
-		hub.SendDriverArrived(rideRequest.ClientID, arrived)
+		hub.SendRideStarted(rideRequest.ClientID, started)
+
+		// Also send a general status update notification
+		statusUpdate := services.WebSocketMessage{
+			Type: "ride_started",
+			Data: gin.H{
+				"rideId":     rideRequest.ID,
+				"driverId":   driverID,
+				"driverName": driver.Username,
+				"status":     rideRequest.Status,
+				"message":    "Ride has started - proceeding to destination",
+			},
+		}
+
+		notificationData, _ := json.Marshal(statusUpdate)
+		hub.BroadcastToUser(rideRequest.ClientID, notificationData)
 
 		// Notify driver
-		ctx := context.Background()
-		services.PublishRideUpdate(ctx, uint(rideID), "started", gin.H{
-			"message": "Ride started - proceed to destination",
-		})
+		driverNotification := services.WebSocketMessage{
+			Type: "ride_started",
+			Data: gin.H{
+				"rideId":     rideRequest.ID,
+				"clientId":   rideRequest.ClientID,
+				"clientName": client.Username,
+				"status":     rideRequest.Status,
+				"message":    "Ride started - proceed to destination",
+			},
+		}
+
+		driverData, _ := json.Marshal(driverNotification)
+		hub.BroadcastToUser(driverID, driverData)
 
 		c.JSON(200, gin.H{
 			"message": "Ride started successfully",

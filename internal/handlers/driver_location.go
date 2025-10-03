@@ -119,7 +119,7 @@ func UpdateDriverAvailability(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		var input struct {
-			IsAvailable bool `json:"isAvailable" binding:"required"`
+			IsAvailable *bool `json:"isAvailable"`
 		}
 
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -127,10 +127,15 @@ func UpdateDriverAvailability(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		if input.IsAvailable == nil {
+			c.JSON(400, gin.H{"error": "isAvailable field is required"})
+			return
+		}
+
 		ctx := context.Background()
 
 		// Update availability in Redis
-		if err := services.SetDriverAvailability(ctx, driverID, input.IsAvailable); err != nil {
+		if err := services.SetDriverAvailability(ctx, driverID, *input.IsAvailable); err != nil {
 			c.JSON(500, gin.H{"error": "Failed to update availability"})
 			return
 		}
@@ -142,7 +147,7 @@ func UpdateDriverAvailability(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		location.IsAvailable = input.IsAvailable
+		location.IsAvailable = *input.IsAvailable
 		location.LastSeen = time.Now()
 
 		if err := db.Save(&location).Error; err != nil {
@@ -152,7 +157,7 @@ func UpdateDriverAvailability(db *gorm.DB) gin.HandlerFunc {
 
 		c.JSON(200, gin.H{
 			"message":     "Availability updated successfully",
-			"isAvailable": input.IsAvailable,
+			"isAvailable": *input.IsAvailable,
 		})
 	}
 }

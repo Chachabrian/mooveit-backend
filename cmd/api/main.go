@@ -95,6 +95,7 @@ func main() {
 				driver.GET("/assigned-rides", handlers.GetDriverAssignedRides(db))
 				driver.POST("/rides/:rideId/accept", handlers.AcceptRide(db, hub))
 				driver.POST("/rides/:rideId/reject", handlers.RejectRide(db, hub))
+				driver.POST("/rides/:rideId/arrived", handlers.DriverArrived(db, hub))
 				driver.POST("/rides/:rideId/start", handlers.StartRide(db, hub))
 				driver.GET("/trip-history", handlers.GetDriverTripHistory(db))
 			}

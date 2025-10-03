@@ -153,6 +153,21 @@ type DriverArrived struct {
 	DriverID uint `json:"driverId"`
 }
 
+// RideStarted represents a ride start notification
+type RideStarted struct {
+	RideID   uint `json:"rideId"`
+	DriverID uint `json:"driverId"`
+}
+
+// RideCompleted represents a ride completion notification
+type RideCompleted struct {
+	RideID         uint    `json:"rideId"`
+	DriverID       uint    `json:"driverId"`
+	ActualFare     float64 `json:"actualFare"`
+	ActualDistance float64 `json:"actualDistance"`
+	ActualDuration int     `json:"actualDuration"`
+}
+
 // RequestRide represents a ride request from client
 type RequestRide struct {
 	Pickup struct {
@@ -306,6 +321,38 @@ func (hub *Hub) SendDriverArrived(clientID uint, arrived DriverArrived) {
 	data, err := json.Marshal(message)
 	if err != nil {
 		log.Printf("Error marshaling driver arrived: %v", err)
+		return
+	}
+
+	hub.BroadcastToUser(clientID, data)
+}
+
+// SendRideStarted sends a ride start notification to the client
+func (hub *Hub) SendRideStarted(clientID uint, started RideStarted) {
+	message := WebSocketMessage{
+		Type: "ride_started",
+		Data: started,
+	}
+
+	data, err := json.Marshal(message)
+	if err != nil {
+		log.Printf("Error marshaling ride started: %v", err)
+		return
+	}
+
+	hub.BroadcastToUser(clientID, data)
+}
+
+// SendRideCompleted sends a ride completion notification to the client
+func (hub *Hub) SendRideCompleted(clientID uint, completed RideCompleted) {
+	message := WebSocketMessage{
+		Type: "ride_completed",
+		Data: completed,
+	}
+
+	data, err := json.Marshal(message)
+	if err != nil {
+		log.Printf("Error marshaling ride completed: %v", err)
 		return
 	}
 

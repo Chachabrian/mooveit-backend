@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"strconv"
 
 	"github.com/chachabrian/mooveit-backend/internal/models"
@@ -135,13 +136,65 @@ func CompleteTrip(db *gorm.DB, hub *services.Hub) gin.HandlerFunc {
 		ctx := context.Background()
 		services.SetDriverAvailability(ctx, driverID, true)
 
-		// Notify client via WebSocket
-		services.PublishRideUpdate(ctx, uint(rideID), "completed", gin.H{
-			"actualFare":     input.ActualFare,
-			"actualDistance": input.ActualDistance,
-			"actualDuration": input.ActualDuration,
-			"driverNotes":    input.DriverNotes,
-		})
+		// Get client and driver information for notifications
+		var client models.User
+		if err := db.Where("id = ?", rideRequest.ClientID).First(&client).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to get client information"})
+			return
+		}
+
+		var driver models.User
+		if err := db.Where("id = ?", driverID).First(&driver).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to get driver information"})
+			return
+		}
+
+		// Notify client that ride has completed
+		completed := services.RideCompleted{
+			RideID:         uint(rideID),
+			DriverID:       driverID,
+			ActualFare:     input.ActualFare,
+			ActualDistance: input.ActualDistance,
+			ActualDuration: input.ActualDuration,
+		}
+		hub.SendRideCompleted(rideRequest.ClientID, completed)
+
+		// Also send a general status update notification
+		statusUpdate := services.WebSocketMessage{
+			Type: "ride_completed",
+			Data: gin.H{
+				"rideId":         uint(rideID),
+				"driverId":       driverID,
+				"driverName":     driver.Username,
+				"status":         rideRequest.Status,
+				"actualFare":     input.ActualFare,
+				"actualDistance": input.ActualDistance,
+				"actualDuration": input.ActualDuration,
+				"driverNotes":    input.DriverNotes,
+				"message":        "Ride completed successfully",
+			},
+		}
+
+		notificationData, _ := json.Marshal(statusUpdate)
+		hub.BroadcastToUser(rideRequest.ClientID, notificationData)
+
+		// Notify driver
+		driverNotification := services.WebSocketMessage{
+			Type: "ride_completed",
+			Data: gin.H{
+				"rideId":         uint(rideID),
+				"clientId":       rideRequest.ClientID,
+				"clientName":     client.Username,
+				"status":         rideRequest.Status,
+				"actualFare":     input.ActualFare,
+				"actualDistance": input.ActualDistance,
+				"actualDuration": input.ActualDuration,
+				"message":        "Ride completed - you are now available for new rides",
+			},
+		}
+
+		driverData, _ := json.Marshal(driverNotification)
+		hub.BroadcastToUser(driverID, driverData)
 
 		c.JSON(200, gin.H{
 			"message":    "Trip completed successfully",
