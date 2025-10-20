@@ -112,6 +112,23 @@ func AcceptRide(db *gorm.DB, hub *services.Hub) gin.HandlerFunc {
 		}
 		hub.SendRideAccepted(rideRequest.ClientID, accepted)
 
+		// Send FCM push notification to client
+		ctx = context.Background()
+		if client.FCMToken != "" {
+			var driver models.User
+			if err := db.First(&driver, driverID).Error; err == nil {
+				vehicleDetails := driver.CarMake + " " + driver.CarColor + " - " + driver.CarPlate
+				go services.SendRideAcceptedNotification(
+					ctx,
+					client.FCMToken,
+					rideRequest.ID,
+					driver.Username,
+					vehicleDetails,
+					eta,
+				)
+			}
+		}
+
 		// Notify driver with pickup details
 		driverNotification := services.WebSocketMessage{
 			Type: "ride_accepted",
@@ -288,6 +305,17 @@ func DriverArrived(db *gorm.DB, hub *services.Hub) gin.HandlerFunc {
 		}
 		hub.SendDriverArrived(rideRequest.ClientID, arrived)
 
+		// Send FCM push notification to client
+		ctx := context.Background()
+		if client.FCMToken != "" {
+			go services.SendDriverArrivedNotification(
+				ctx,
+				client.FCMToken,
+				rideRequest.ID,
+				driver.Username,
+			)
+		}
+
 		// Also send a general status update notification
 		statusUpdate := services.WebSocketMessage{
 			Type: "driver_arrived",
@@ -388,6 +416,17 @@ func StartRide(db *gorm.DB, hub *services.Hub) gin.HandlerFunc {
 			DriverID: driverID,
 		}
 		hub.SendRideStarted(rideRequest.ClientID, started)
+
+		// Send FCM push notification to client
+		ctx := context.Background()
+		if client.FCMToken != "" {
+			go services.SendRideStartedNotification(
+				ctx,
+				client.FCMToken,
+				rideRequest.ID,
+				driver.Username,
+			)
+		}
 
 		// Also send a general status update notification
 		statusUpdate := services.WebSocketMessage{

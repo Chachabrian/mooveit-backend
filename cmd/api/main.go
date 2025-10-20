@@ -41,6 +41,16 @@ func main() {
 		log.Fatalf("Failed to initialize Redis: %v", err)
 	}
 
+	// Initialize Firebase (optional - will log warning if not configured)
+	if err := services.InitFirebase(); err != nil {
+		log.Printf("Firebase initialization warning: %v", err)
+	}
+
+	// Initialize Storage (S3 or local fallback)
+	if err := services.InitStorage(); err != nil {
+		log.Fatalf("Failed to initialize storage: %v", err)
+	}
+
 	// Initialize WebSocket hub
 	hub := services.NewHub()
 	go hub.Run()
@@ -127,6 +137,7 @@ func main() {
 				pricing.POST("/driver", handlers.SetDriverPricing(db))
 				pricing.GET("/driver", handlers.GetDriverPricing(db))
 				pricing.GET("/calculate", handlers.CalculateFare(db))
+				pricing.GET("/estimate", handlers.GetDynamicFareEstimate(db))
 			}
 
 			// Bookings routes
@@ -143,6 +154,20 @@ func main() {
 			parcels := protected.Group("/parcels")
 			{
 				parcels.POST("", handlers.CreateParcel(db))
+			}
+
+			// Notification routes
+			notifications := protected.Group("/notifications")
+			{
+				notifications.POST("/register-token", handlers.RegisterFCMToken(db))
+				notifications.DELETE("/remove-token", handlers.RemoveFCMToken(db))
+				notifications.POST("/test", handlers.TestNotification(db))
+				notifications.POST("/broadcast", handlers.SendBroadcastNotificationHandler(db))
+				notifications.POST("/scheduled-rides-available", handlers.NotifyScheduledRidesAvailable(db))
+
+				// Notification preferences
+				notifications.GET("/preferences", handlers.GetNotificationPreferences(db))
+				notifications.PUT("/preferences", handlers.UpdateNotificationPreferences(db))
 			}
 		}
 	}

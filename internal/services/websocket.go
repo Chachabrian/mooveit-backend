@@ -261,6 +261,12 @@ func (c *Client) writePump() {
 				log.Printf("WebSocket write error: %v", err)
 				return
 			}
+
+			// Log message type for debugging
+			var msg WebSocketMessage
+			if err := json.Unmarshal(message, &msg); err == nil {
+				log.Printf("[WS→] Sent to client %d (%s): %s", c.ID, c.UserType, msg.Type)
+			}
 		}
 	}
 }
@@ -292,7 +298,43 @@ func (hub *Hub) SendDriverLocationUpdate(update DriverLocationUpdate) {
 		return
 	}
 
-	hub.broadcast <- data
+	// Broadcast to all connected clients using the safe method
+	hub.BroadcastToAll(data)
+}
+
+// SendDriverLocationUpdateToClient sends a driver location update to a specific client
+func (hub *Hub) SendDriverLocationUpdateToClient(clientID uint, update DriverLocationUpdate) {
+	message := WebSocketMessage{
+		Type: "driver_location_update",
+		Data: update,
+	}
+
+	data, err := json.Marshal(message)
+	if err != nil {
+		log.Printf("Error marshaling driver location update: %v", err)
+		return
+	}
+
+	hub.BroadcastToUser(clientID, data)
+	log.Printf("Sent driver location update to client %d: driver %d at (%.6f, %.6f)",
+		clientID, update.DriverID, update.Location.Lat, update.Location.Lng)
+}
+
+// BroadcastToAll sends a message to all connected clients
+func (hub *Hub) BroadcastToAll(message []byte) {
+	hub.mutex.RLock()
+	defer hub.mutex.RUnlock()
+
+	log.Printf("Broadcasting to %d connected clients", len(hub.clients))
+	for client := range hub.clients {
+		select {
+		case client.Send <- message:
+			// Message sent successfully
+		default:
+			// Client's send channel is full, skip
+			log.Printf("Warning: Could not send to client %d (channel full)", client.ID)
+		}
+	}
 }
 
 // SendRideAccepted sends a ride acceptance notification to the client

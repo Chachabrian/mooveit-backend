@@ -3,11 +3,9 @@ package handlers
 import (
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
-	"time"
 
 	"github.com/chachabrian/mooveit-backend/internal/models"
+	"github.com/chachabrian/mooveit-backend/internal/services"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -36,27 +34,15 @@ func CreateParcel(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Use absolute path for uploads
-		uploadDir := "/app/uploads/parcels"
-
-		// Create directory if it doesn't exist
-		if err := os.MkdirAll(uploadDir, 0755); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload directory: " + err.Error()})
+		// Upload to S3 or local storage
+		imageURL, err := services.UploadImage(file, "parcels")
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":   "Failed to upload image",
+				"details": err.Error(),
+			})
 			return
 		}
-
-		// Generate unique filename using timestamp
-		fileExt := filepath.Ext(file.Filename)
-		fileName := fmt.Sprintf("%d%s", time.Now().UnixNano(), fileExt)
-		filePath := filepath.Join(uploadDir, fileName)
-
-		if err := c.SaveUploadedFile(file, filePath); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file: " + err.Error()})
-			return
-		}
-
-		// Store relative path in database
-		dbPath := filepath.Join("uploads/parcels", fileName)
 
 		// First verify if the ride exists
 		var ride models.Ride
@@ -65,10 +51,10 @@ func CreateParcel(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Create parcel record
+		// Create parcel record with image URL
 		parcel := models.Parcel{
 			RideID:            input.RideID,
-			ParcelImage:       dbPath,
+			ParcelImage:       imageURL, // Store full URL (S3) or relative path (local)
 			ParcelDescription: input.ParcelDescription,
 			ReceiverName:      input.ReceiverName,
 			ReceiverContact:   input.ReceiverContact,
@@ -92,13 +78,7 @@ func CreateParcel(db *gorm.DB) gin.HandlerFunc {
 
 func GetParcelDetails(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Get base URL from environment variable or configuration
-		baseURL := os.Getenv("BASE_URL") // e.g., "https://api.yourdomain.com"
-		if baseURL == "" {
-			baseURL = "http://localhost:8080" // fallback for development
-		}
-
-		bookingId := c.Param("id") // Use "id" instead of "bookingId"
+		bookingId := c.Param("id")
 
 		var booking models.Booking
 		if err := db.Preload("Ride").First(&booking, bookingId).Error; err != nil {
@@ -112,14 +92,15 @@ func GetParcelDetails(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Construct full URL for parcel image
-		fullImageURL := fmt.Sprintf("%s/%s", baseURL, parcel.ParcelImage)
+		// Get full image URL (handles both S3 and local storage)
+		imageURL := services.GetImageURL(parcel.ParcelImage)
 
 		c.JSON(200, gin.H{
-			"parcelImage":       fullImageURL,
+			"parcelImage":       imageURL,
 			"parcelDescription": parcel.ParcelDescription,
 			"receiverName":      parcel.ReceiverName,
 			"receiverContact":   parcel.ReceiverContact,
+			"receiverEmail":     parcel.ReceiverEmail,
 			"destination":       parcel.Destination,
 		})
 	}

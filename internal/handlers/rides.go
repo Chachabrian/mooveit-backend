@@ -1,10 +1,14 @@
 package handlers
 
 import (
+	"context"
+	"fmt"
+	"log"
 	"strings"
 	"time"
 
 	"github.com/chachabrian/mooveit-backend/internal/models"
+	"github.com/chachabrian/mooveit-backend/internal/services"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -54,6 +58,31 @@ func CreateRide(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Send push notification to clients who opted-in for available rides notifications
+		go func() {
+			ctx := context.Background()
+			payload := services.NotificationPayload{
+				Title: "New Ride Available! 🚛",
+				Body: fmt.Sprintf("From %s to %s - KES %.2f",
+					input.CurrentLocation, input.Destination, input.Price),
+				Data: map[string]interface{}{
+					"type":            "new_ride_available",
+					"rideId":          fmt.Sprintf("%d", ride.ID),
+					"currentLocation": input.CurrentLocation,
+					"destination":     input.Destination,
+					"price":           fmt.Sprintf("%.2f", input.Price),
+					"date":            input.Date.Format(time.RFC3339),
+					"truckSize":       input.TruckSize,
+				},
+				ChannelID: "mooveit_rides",
+				Priority:  "high",
+			}
+			// Send to clients who subscribed to available rides topic
+			if err := services.SendTopicNotification(ctx, "clients-available-rides", payload); err != nil {
+				log.Printf("Failed to send new ride notification to subscribed clients: %v", err)
+			}
+		}()
+
 		c.JSON(201, ride)
 	}
 }
@@ -66,9 +95,9 @@ func GetAvailableRides(db *gorm.DB) gin.HandlerFunc {
 
 		var rides []models.Ride
 		query := db.Preload("Driver").
-			Where("rides.date > ? AND rides.date <= ? AND rides.status = ?", 
-				time.Now(), 
-				time.Now().Add(24*time.Hour), 
+			Where("rides.date > ? AND rides.date <= ? AND rides.status = ?",
+				time.Now(),
+				time.Now().Add(24*time.Hour),
 				"available")
 
 		if destination != "" {
@@ -109,8 +138,8 @@ func GetAllRides(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var rides []models.Ride
 		if err := db.Preload("Driver").
-			Where("date > ? AND date <= ?", 
-				time.Now(), 
+			Where("date > ? AND date <= ?",
+				time.Now(),
 				time.Now().Add(24*time.Hour)).
 			Order("date ASC").
 			Find(&rides).Error; err != nil {

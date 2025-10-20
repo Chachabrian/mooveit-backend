@@ -159,6 +159,17 @@ func CompleteTrip(db *gorm.DB, hub *services.Hub) gin.HandlerFunc {
 		}
 		hub.SendRideCompleted(rideRequest.ClientID, completed)
 
+		// Send FCM push notification to client
+		ctx = context.Background()
+		if client.FCMToken != "" {
+			go services.SendRideCompletedNotification(
+				ctx,
+				client.FCMToken,
+				uint(rideID),
+				input.ActualFare,
+			)
+		}
+
 		// Also send a general status update notification
 		statusUpdate := services.WebSocketMessage{
 			Type: "ride_completed",

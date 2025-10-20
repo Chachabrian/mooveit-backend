@@ -94,7 +94,19 @@ func UpdateDriverLocation(db *gorm.DB, hub *services.Hub) gin.HandlerFunc {
 		update.Location.Lng = input.Lng
 		update.Location.Heading = input.Heading
 
-		hub.SendDriverLocationUpdate(update)
+		// Check if driver has an active ride (accepted or started)
+		var activeRide models.RideRequest
+		if err := db.Where("driver_id = ? AND status IN (?)", driverID, []string{
+			models.RideStatusAccepted,
+			models.RideStatusArrived,
+			models.RideStatusStarted,
+		}).First(&activeRide).Error; err == nil {
+			// Driver has an active ride, send targeted update to the client
+			hub.SendDriverLocationUpdateToClient(activeRide.ClientID, update)
+		} else {
+			// No active ride, broadcast to all clients (for tracking available drivers)
+			hub.SendDriverLocationUpdate(update)
+		}
 
 		c.JSON(200, gin.H{
 			"message": "Location updated successfully",

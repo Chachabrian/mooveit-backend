@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"strconv"
 
@@ -106,6 +107,8 @@ func RequestRide(db *gorm.DB, hub *services.Hub) gin.HandlerFunc {
 
 		// Send ride request notifications to nearby drivers
 		notificationsSent := 0
+		ctx := context.Background()
+
 		for _, location := range locations {
 			driverDistance := utils.HaversineDistance(
 				input.Pickup.Lat, input.Pickup.Lng,
@@ -139,6 +142,20 @@ func RequestRide(db *gorm.DB, hub *services.Hub) gin.HandlerFunc {
 				rideNotification := services.WebSocketMessage{
 					Type: "ride_request",
 					Data: notificationData,
+				}
+
+				// Send FCM push notification to driver
+				var driver models.User
+				if err := db.First(&driver, location.DriverID).Error; err == nil && driver.FCMToken != "" {
+					go services.SendRideRequestNotification(
+						ctx,
+						driver.FCMToken,
+						rideRequest.ID,
+						client.Username,
+						input.Pickup.Address,
+						input.Destination.Address,
+						price,
+					)
 				}
 
 				// Marshal and send notification

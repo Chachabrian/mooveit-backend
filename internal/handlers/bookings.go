@@ -1,9 +1,12 @@
 package handlers
 
 import (
+	"context"
+	"fmt"
 	"log"
 
 	"github.com/chachabrian/mooveit-backend/internal/models"
+	"github.com/chachabrian/mooveit-backend/internal/services"
 	"github.com/chachabrian/mooveit-backend/pkg/utils"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -74,6 +77,25 @@ func CreateBooking(db *gorm.DB) gin.HandlerFunc {
 		); err != nil {
 			// Log the error but don't fail the transaction
 			log.Printf("Failed to send email to driver: %v", err)
+		}
+
+		// Send FCM push notification to driver
+		if ride.Driver.FCMToken != "" {
+			ctx := context.Background()
+			payload := services.NotificationPayload{
+				Title: "New Booking Request!",
+				Body:  fmt.Sprintf("%s has booked your ride to %s", client.Username, ride.Destination),
+				Data: map[string]interface{}{
+					"type":        "new_booking",
+					"bookingId":   fmt.Sprintf("%d", booking.ID),
+					"rideId":      fmt.Sprintf("%d", ride.ID),
+					"clientName":  client.Username,
+					"destination": ride.Destination,
+				},
+			}
+			if err := services.SendNotificationToToken(ctx, ride.Driver.FCMToken, payload); err != nil {
+				log.Printf("Failed to send FCM notification to driver: %v", err)
+			}
 		}
 
 		// Commit transaction
@@ -319,6 +341,28 @@ func UpdateBookingStatus(db *gorm.DB) gin.HandlerFunc {
 				log.Printf("Failed to send email: %v", err)
 			}
 
+			// Send FCM push notification to client
+			if client.FCMToken != "" {
+				ctx := context.Background()
+				payload := services.NotificationPayload{
+					Title: "Booking Accepted! 🎉",
+					Body:  fmt.Sprintf("%s has accepted your booking. Driver: %s (%s)", driver.Username, driver.CarMake, driver.CarPlate),
+					Data: map[string]interface{}{
+						"type":        "booking_accepted",
+						"bookingId":   fmt.Sprintf("%d", booking.ID),
+						"rideId":      fmt.Sprintf("%d", booking.Ride.ID),
+						"driverName":  driver.Username,
+						"driverPhone": driver.PhoneNumber,
+						"carPlate":    driver.CarPlate,
+						"carMake":     driver.CarMake,
+						"carColor":    driver.CarColor,
+					},
+				}
+				if err := services.SendNotificationToToken(ctx, client.FCMToken, payload); err != nil {
+					log.Printf("Failed to send FCM notification to client: %v", err)
+				}
+			}
+
 		} else if input.Status == "cancelled" || input.Status == "rejected" {
 			// Reset ride status to available if booking is cancelled or rejected
 			if err := tx.Model(&booking.Ride).Update("status", "available").Error; err != nil {
@@ -345,6 +389,23 @@ func UpdateBookingStatus(db *gorm.DB) gin.HandlerFunc {
 				if err := utils.SendBookingRejectedEmail(client.Email); err != nil {
 					// Log the error but don't fail the transaction
 					log.Printf("Failed to send rejection email: %v", err)
+				}
+
+				// Send FCM push notification to client
+				if client.FCMToken != "" {
+					ctx := context.Background()
+					payload := services.NotificationPayload{
+						Title: "Booking Rejected",
+						Body:  "Unfortunately, the driver has rejected your booking request. Please try another ride.",
+						Data: map[string]interface{}{
+							"type":      "booking_rejected",
+							"bookingId": fmt.Sprintf("%d", booking.ID),
+							"rideId":    fmt.Sprintf("%d", booking.Ride.ID),
+						},
+					}
+					if err := services.SendNotificationToToken(ctx, client.FCMToken, payload); err != nil {
+						log.Printf("Failed to send FCM notification to client: %v", err)
+					}
 				}
 			}
 		}

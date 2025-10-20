@@ -218,7 +218,7 @@ func GetDriverPricing(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-// CalculateFare calculates fare for a trip
+// CalculateFare calculates fare for a trip (legacy endpoint - kept for backward compatibility)
 func CalculateFare(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		latStr := c.Query("lat")
@@ -310,6 +310,67 @@ func CalculateFare(db *gorm.DB) gin.HandlerFunc {
 				"baseFare":     baseFare,
 				"distanceFare": distanceFare,
 				"timeFare":     timeFare,
+			},
+		})
+	}
+}
+
+// GetDynamicFareEstimate calculates fare with traffic-aware pricing
+func GetDynamicFareEstimate(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Parse query parameters
+		var input struct {
+			PickupLat float64 `form:"pickupLat" binding:"required"`
+			PickupLng float64 `form:"pickupLng" binding:"required"`
+			DestLat   float64 `form:"destLat" binding:"required"`
+			DestLng   float64 `form:"destLng" binding:"required"`
+		}
+
+		if err := c.ShouldBindQuery(&input); err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Validate coordinates
+		if input.PickupLat < -90 || input.PickupLat > 90 {
+			c.JSON(400, gin.H{"error": "Invalid pickup latitude"})
+			return
+		}
+		if input.PickupLng < -180 || input.PickupLng > 180 {
+			c.JSON(400, gin.H{"error": "Invalid pickup longitude"})
+			return
+		}
+		if input.DestLat < -90 || input.DestLat > 90 {
+			c.JSON(400, gin.H{"error": "Invalid destination latitude"})
+			return
+		}
+		if input.DestLng < -180 || input.DestLng > 180 {
+			c.JSON(400, gin.H{"error": "Invalid destination longitude"})
+			return
+		}
+
+		// Calculate dynamic fare
+		result := utils.CalculateDynamicFare(
+			input.PickupLat,
+			input.PickupLng,
+			input.DestLat,
+			input.DestLng,
+		)
+
+		c.JSON(200, gin.H{
+			"fare":              result.TotalFare,
+			"distance":          result.Distance,
+			"baseRate":          result.BaseRate,
+			"trafficMultiplier": result.TrafficMultiplier,
+			"hasTraffic":        result.HasTraffic,
+			"minimumFare":       result.MinimumFare,
+			"breakdown":         result.Breakdown,
+			"currency":          "KES",
+			"pricing": gin.H{
+				"standardRate":    35.0,
+				"trafficRate":     38.0,
+				"minimumFare":     150.0,
+				"minimumDistance": 3.0,
 			},
 		})
 	}

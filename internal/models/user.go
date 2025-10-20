@@ -24,6 +24,7 @@ type User struct {
 	CarPlate     string   `gorm:"column:car_plate"`
 	CarMake      string   `gorm:"column:car_make"`
 	CarColor     string   `gorm:"column:car_color"`
+	FCMToken     string   `gorm:"column:fcm_token"` // Firebase Cloud Messaging token for push notifications
 }
 
 // TableName specifies the table name
