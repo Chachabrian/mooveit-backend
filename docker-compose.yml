@@ -55,8 +55,6 @@ services:
     restart: always
     profiles: ["app", "full"]
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     environment:
@@ -123,6 +121,9 @@ services:
 networks:
   mooveit-network:
     driver: bridge
+    # For multi-instance setup, use external network for cross-instance communication
+    # Create with: docker network create mooveit-network
+    # external: true
 
 volumes:
   postgres_data:
