@@ -158,3 +158,5 @@ func SubscribeToAvailableRides(db *gorm.DB, userID uint, fcmToken string) error 
 	return nil
 }
 
+
+

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"sort"
 	"strconv"
 	"time"
 
@@ -179,7 +180,7 @@ func GetNearbyDrivers(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		latStr := c.Query("lat")
 		lngStr := c.Query("lng")
-		radiusStr := c.DefaultQuery("radius", "10") // Default 10km radius
+		radiusStr := c.DefaultQuery("radius", "5") // Default 5km radius (reduced from 10km)
 
 		if latStr == "" || lngStr == "" {
 			c.JSON(400, gin.H{"error": "Latitude and longitude are required"})
@@ -214,7 +215,7 @@ func GetNearbyDrivers(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Get all available drivers
+		// Get all drivers that are BOTH online AND available
 		var locations []models.DriverLocation
 		if err := db.Preload("Driver").
 			Where("is_online = ? AND is_available = ?", true, true).
@@ -223,10 +224,23 @@ func GetNearbyDrivers(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		var nearbyDrivers []gin.H
+		// Structure to hold driver info with distance for sorting
+		type DriverWithDistance struct {
+			Data     gin.H
+			Distance float64
+		}
+
+		var driversWithDistance []DriverWithDistance
 		ctx := context.Background()
 
 		for _, location := range locations {
+			// Double-check availability from Redis (real-time status)
+			isAvailable, err := services.GetDriverAvailability(ctx, location.DriverID)
+			if err != nil || !isAvailable {
+				// Skip if driver is not available in Redis or error occurred
+				continue
+			}
+
 			// Calculate distance
 			distance := utils.HaversineDistance(lat, lng, location.Latitude, location.Longitude)
 
@@ -258,8 +272,28 @@ func GetNearbyDrivers(db *gorm.DB) gin.HandlerFunc {
 					"distance":       distance,
 				}
 
-				nearbyDrivers = append(nearbyDrivers, driver)
+				driversWithDistance = append(driversWithDistance, DriverWithDistance{
+					Data:     driver,
+					Distance: distance,
+				})
 			}
+		}
+
+		// Sort drivers by distance (nearest first)
+		sort.Slice(driversWithDistance, func(i, j int) bool {
+			return driversWithDistance[i].Distance < driversWithDistance[j].Distance
+		})
+
+		// Limit to maximum 4 drivers (prioritizing nearest)
+		maxDrivers := 4
+		if len(driversWithDistance) > maxDrivers {
+			driversWithDistance = driversWithDistance[:maxDrivers]
+		}
+
+		// Extract just the driver data
+		var nearbyDrivers []gin.H
+		for _, dwd := range driversWithDistance {
+			nearbyDrivers = append(nearbyDrivers, dwd.Data)
 		}
 
 		// Cache nearby drivers in Redis

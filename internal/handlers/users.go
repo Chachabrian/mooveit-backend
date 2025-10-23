@@ -36,11 +36,11 @@ func UpdateProfile(db *gorm.DB) gin.HandlerFunc {
 		userId := c.GetUint("userId")
 
 		var input struct {
-			Username    string `json:"username"`
-			PhoneNumber string `json:"phoneNumber"`
-			CarPlate    string `json:"carPlate"`
-			CarMake     string `json:"carMake"`
-			CarColor    string `json:"carColor"`
+			Username    *string `json:"username"`
+			PhoneNumber *string `json:"phoneNumber"`
+			CarPlate    *string `json:"carPlate"`
+			CarMake     *string `json:"carMake"`
+			CarColor    *string `json:"carColor"`
 		}
 
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -54,16 +54,32 @@ func UpdateProfile(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		updates := map[string]interface{}{
-			"username":     input.Username,
-			"phone_number": input.PhoneNumber,
-			"car_plate":    input.CarPlate,
-			"car_make":     input.CarMake,
-			"car_color":    input.CarColor,
+		// Update fields individually to handle empty strings properly
+		if input.Username != nil {
+			user.Username = *input.Username
+		}
+		if input.PhoneNumber != nil {
+			user.PhoneNumber = *input.PhoneNumber
+		}
+		if input.CarPlate != nil {
+			user.CarPlate = *input.CarPlate
+		}
+		if input.CarMake != nil {
+			user.CarMake = *input.CarMake
+		}
+		if input.CarColor != nil {
+			user.CarColor = *input.CarColor
 		}
 
-		if err := db.Model(&user).Updates(updates).Error; err != nil {
+		// Use Save() instead of Updates() to persist all fields including empty strings
+		if err := db.Save(&user).Error; err != nil {
 			c.JSON(500, gin.H{"error": "Failed to update profile"})
+			return
+		}
+
+		// Reload user from database to ensure we return the actual saved data
+		if err := db.First(&user, userId).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to reload user data"})
 			return
 		}
 

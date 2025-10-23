@@ -194,6 +194,13 @@ func RejectRide(db *gorm.DB, hub *services.Hub) gin.HandlerFunc {
 			return
 		}
 
+		// Get client information for notifications
+		var client models.User
+		if err := db.Where("id = ?", rideRequest.ClientID).First(&client).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to get client information"})
+			return
+		}
+
 		// Update ride status to cancelled
 		rideRequest.Status = models.RideStatusCancelled
 		if err := db.Save(&rideRequest).Error; err != nil {
@@ -201,8 +208,24 @@ func RejectRide(db *gorm.DB, hub *services.Hub) gin.HandlerFunc {
 			return
 		}
 
-		// Notify client via WebSocket
+		// Send WebSocket notification to client
+		rejected := services.RideRejected{
+			RideID: rideRequest.ID,
+			Reason: "Driver declined your ride request",
+		}
+		hub.SendRideRejected(rideRequest.ClientID, rejected)
+
+		// Send FCM push notification to client
 		ctx := context.Background()
+		if client.FCMToken != "" {
+			go services.SendRideRejectedNotification(
+				ctx,
+				client.FCMToken,
+				rideRequest.ID,
+			)
+		}
+
+		// Also publish to Redis for any other subscribers
 		services.PublishRideUpdate(ctx, uint(rideID), "rejected", gin.H{
 			"reason": "Driver rejected the ride",
 		})

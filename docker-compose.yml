@@ -30,6 +30,15 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save 60 1000
+      --save 300 100
+      --save 900 10
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -46,7 +55,10 @@ services:
     restart: always
     profiles: ["app", "full"]
     depends_on:
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       - DB_HOST=${DB_HOST}
       - DB_PORT=${DB_PORT}

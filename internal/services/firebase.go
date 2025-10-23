@@ -92,18 +92,29 @@ func getAndroidConfig(payload NotificationPayload) *messaging.AndroidConfig {
 		priority = messaging.PriorityDefault
 	}
 
+	androidNotif := &messaging.AndroidNotification{
+		ChannelID: channelID,
+		Priority:  priority,
+		Icon:      icon,
+		Color:     color,
+		Tag:       payload.Tag,
+	}
+
+	// Handle sound - if custom sound, set it directly; otherwise use default
+	if sound != "" && sound != "default" {
+		// Custom sound file (e.g., "ringtone.mp3" or "ringtone")
+		androidNotif.Sound = sound
+		androidNotif.DefaultSound = false
+		// Always use default vibration (controlled by Android notification channel)
+		androidNotif.DefaultVibrateTimings = true
+	} else {
+		androidNotif.DefaultSound = true
+		androidNotif.DefaultVibrateTimings = true
+	}
+
 	return &messaging.AndroidConfig{
-		Priority: "high",
-		Notification: &messaging.AndroidNotification{
-			Sound:                 sound,
-			ChannelID:             channelID,
-			Priority:              priority,
-			DefaultSound:          sound == "default",
-			Icon:                  icon,
-			Color:                 color,
-			Tag:                   payload.Tag,
-			DefaultVibrateTimings: true,
-		},
+		Priority:     "high",
+		Notification: androidNotif,
 	}
 }
 
@@ -119,14 +130,27 @@ func getAPNSConfig(payload NotificationPayload) *messaging.APNSConfig {
 		badge = *payload.BadgeCount
 	}
 
+	aps := &messaging.Aps{
+		Badge:            &badge,
+		MutableContent:   true,
+		ContentAvailable: true,
+	}
+
+	// For iOS, custom sounds need to be without extension (FCM adds .caf automatically)
+	// If sound is "ringtone.caf", we need to pass "ringtone"
+	if sound != "default" {
+		// Remove file extension for iOS
+		if len(sound) > 4 && sound[len(sound)-4:] == ".caf" {
+			sound = sound[:len(sound)-4]
+		} else if len(sound) > 4 && sound[len(sound)-4:] == ".mp3" {
+			sound = sound[:len(sound)-4]
+		}
+	}
+	aps.Sound = sound
+
 	return &messaging.APNSConfig{
 		Payload: &messaging.APNSPayload{
-			Aps: &messaging.Aps{
-				Sound:            sound,
-				Badge:            &badge,
-				MutableContent:   true,
-				ContentAvailable: true,
-			},
+			Aps: aps,
 		},
 	}
 }
@@ -257,8 +281,11 @@ func SendNotificationToMultipleTokens(ctx context.Context, tokens []string, payl
 // SendRideRequestNotification sends a ride request notification to a driver
 func SendRideRequestNotification(ctx context.Context, driverToken string, rideID uint, clientName, pickupAddress, destAddress string, fare float64) error {
 	payload := NotificationPayload{
-		Title: "New Ride Request",
-		Body:  fmt.Sprintf("%s requested a ride from %s", clientName, pickupAddress),
+		Title:     "New Ride Request",
+		Body:      fmt.Sprintf("%s requested a ride from %s", clientName, pickupAddress),
+		Sound:     "ringtone", // Custom ringtone for ride requests (ringtone.mp3 for Android, ringtone.caf for iOS)
+		ChannelID: "ride_requests",
+		Priority:  "high",
 		Data: map[string]interface{}{
 			"type":           "ride_request",
 			"rideId":         rideID,
@@ -333,6 +360,23 @@ func SendRideCompletedNotification(ctx context.Context, clientToken string, ride
 			"rideId":         rideID,
 			"fare":           fare,
 			"notificationId": fmt.Sprintf("ride_completed_%d", rideID),
+		},
+	}
+
+	return SendNotificationToToken(ctx, clientToken, payload)
+}
+
+// SendRideRejectedNotification sends notification when driver rejects a ride request
+func SendRideRejectedNotification(ctx context.Context, clientToken string, rideID uint) error {
+	payload := NotificationPayload{
+		Title:    "Ride Request Declined",
+		Body:     "Unfortunately, the driver has declined your ride request. Please try requesting another ride.",
+		Sound:    "default",
+		Priority: "high",
+		Data: map[string]interface{}{
+			"type":           "ride_rejected",
+			"rideId":         rideID,
+			"notificationId": fmt.Sprintf("ride_rejected_%d", rideID),
 		},
 	}
 

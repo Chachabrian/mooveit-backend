@@ -168,6 +168,12 @@ type RideCompleted struct {
 	ActualDuration int     `json:"actualDuration"`
 }
 
+// RideRejected represents a ride rejection notification
+type RideRejected struct {
+	RideID uint   `json:"rideId"`
+	Reason string `json:"reason"`
+}
+
 // RequestRide represents a ride request from client
 type RequestRide struct {
 	Pickup struct {
@@ -395,6 +401,22 @@ func (hub *Hub) SendRideCompleted(clientID uint, completed RideCompleted) {
 	data, err := json.Marshal(message)
 	if err != nil {
 		log.Printf("Error marshaling ride completed: %v", err)
+		return
+	}
+
+	hub.BroadcastToUser(clientID, data)
+}
+
+// SendRideRejected sends a ride rejection notification to the client
+func (hub *Hub) SendRideRejected(clientID uint, rejected RideRejected) {
+	message := WebSocketMessage{
+		Type: "ride_rejected",
+		Data: rejected,
+	}
+
+	data, err := json.Marshal(message)
+	if err != nil {
+		log.Printf("Error marshaling ride rejected: %v", err)
 		return
 	}
 
